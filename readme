@@ -1,0 +1,19 @@
+Information of Coronene by Lei
+
+C11 is the target carbon, it is in bond with C6, C13 and C14. C19 is the central symmetric atom of it.
+exclude the first quantum atom during counting the number of atoms
+
+changes :
+
+*  loop over   gradients (sign flip) is  hidden  inside  derivs
+*  iat  is passed  along with coordinates 
+*  new file IN_dftb    to  set up  dftb calcs: 
+      ntype  
+      lmax
+      '*spl'  files
+todo:
+* dispersion
+*  need to pass  ntype to  derivs.  Rightnow it is hardwired 
+*  make sure we dont need    run.dftb file  insode  derivs/dftb
+
+

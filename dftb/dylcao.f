@@ -1,0 +1,1585 @@
+C
+C      PROGRAM DYLCAO
+C     ================
+C
+C     Copyright 1991 by Peter Blaudeck, Dirk Porezag 
+C
+C *********************************************************************
+C
+C     PROGRAM CHARACTERISTICS 
+C     -----------------------
+C
+C DYLCAO calculates the dynamics of various systems within a 
+C two-centre SETB formalism 
+C
+C
+C
+C    This program was modified by Yasuhito Ohta 8/1/2008
+C
+C *********************************************************************
+C
+C maxima definitions
+C
+      program dftb
+      implicit real*8 (a-h,o-z)
+      include 'maxima.inc'
+C
+      integer izp(nndim), lmax(maxtyp)
+      integer dim(maxtyp,maxtyp), conat(nndim+1)
+      integer numint(maxtyp,maxtyp)
+      integer nexc,nrem
+      real*8 x(3*nndim), xparam(3*nndim), xold(3*nndim), gr(3*nndim)
+      real*8 norm
+      real*8 skhtab(10,maxtab,maxtyp,maxtyp) 
+      real*8 skstab(10,maxtab,maxtyp,maxtyp)
+      real*8 skself(3,maxtyp), sr(maxtyp,maxtyp), nel, convec(3,nndim)
+      real*8 coeff(6,maxint,maxtyp,maxtyp),xr(2,maxint,maxtyp,maxtyp)
+      real*8 efkt(3,maxtyp,maxtyp),cutoff(maxtyp,maxtyp)
+      real*8 xm(maxtyp), xmrc(maxtyp), rmax(maxtyp,maxtyp)
+      real*8 ar(10,maxtyp,maxtyp),qmat(nndim), slkcutoff
+      real*8 espin(maxtyp),ekin
+      character*65 infile, outfile, name, tmpchr, namev
+      character*60 smode(9)
+      character*70 atnames
+      character adummy5*5
+      logical mdtemp, mdfree, stdc, cgrmin, atomic, evector, scfhelp
+      logical converge, mdcorr, dorelax, doecalc
+      logical chrr,constr,ex
+      logical lbfgs,lzmat,lgrad,readco
+      logical lexc
+      external skhpar, skspar
+C Yasuhito Ohta ----------------------
+      parameter(avog=6.0221367D+23,togrm=9.1093897D-28)
+      parameter(amu2au = 1.0d0/avog/togrm)
+      parameter(pi = 3.1415926535897932d0)
+c see http://en.wikipedia.org/wiki/Atomic_units
+      parameter(au2sec=2.418884326505d-17)
+      parameter(au2fs=au2sec*1.D15,fs2au=1.0d0/au2fs)
+      parameter(au2ps=au2sec*1.D12,ps2au=1.d0/au2ps)
+      parameter(rKb=3.16683D-6)
+      real*8 amass(nndim),velo(3*nndim)
+      real*8 gamma_lgv,random_frc
+      real*8 xnose(3),vnose(3),gnose(3)
+      real*8 xnose_atm(3,nndim),vnose_atm(3,nndim),gnose_atm(3,nndim)
+C-------------------------------------
+CCHARMM
+      real*8 xe(3,4*nndim),ze(4*nndim)
+Cinteger nE,nEiter
+      character*2 ext
+C      ME: for constraints like in CHARMM
+      integer lcc,jcc(nndim),atcc1(nndim),atcc2(nndim)
+      real*8 rccval,kccval,rccin
+CDISPERSION
+C integer subsys(NNDIM)
+C real*8 pol(MAXTYP,4),ion(MAXTYP,4),Edis,C6(NNDIM)
+      real*8 edis
+      logical dispers
+      common /disper/ edis, dispers
+CEND DISPERSION
+CCHARMM
+      common /cconstr/ lcc,jcc,atcc1,atcc2,rccval,kccval,rccinc
+      common /extchr/ xe, ze, ne, neiter ,icycle, ext
+      common /sktab/ skhtab,skstab,skself,sr,dim
+      common /spin/ espin
+      common /spltab/ coeff,xr,efkt,cutoff,numint
+      common /concgr/ convec, constr, conat
+C
+C##### 
+C These data are read in by gettab. 
+C Every pair of atoms requires a table containing the Slater-Koster 
+C data. The first line consists of the distance stepwidth and the
+C number of distance values. If the file describes homonuclear
+C interactions, an additional second line contains the energies
+C of the valence d, p and s electrons (diagonal elements of the
+C hamiltonian). 
+C All other lines contain 10 hamiltonian and 10 overlap numbers
+C in the order dds ddp ddd pds pdp pps ppp sds sps sss.
+C The first of these lines (r = 0) contains (in this order):
+C element 01:    mass of the atom (0 for heteroatomic files)
+C         02-09: polynomial coefficients for repulsive part
+C         10:    range of repulsive part
+C         11:    cutoff radius for next neighbour determination
+C All energies in H = Hartrees = 4.358d-11 g*cm**2/s**2
+C All masses in nucleon masses = 1.6603d-24 g
+C
+      common /lmax/ lmax
+      common /izp/ izp, nel, nbeweg
+      common /rdaten/ ar
+      common /machine/ racc
+      real*8 boxsiz, xinvbox, xnullvec,skcut2
+      logical period
+      integer nlat
+      common /box/ boxsiz(3,3),xinvbox(3,3),xnullvec(3), skcut2,nlat(3),
+     *period
+      common /mcharge/ qzero(maxtyp), uhubb(maxtyp)
+      data smode /'MD relaxation with heat reservoir   ', 'free MD witho
+     *ut external constraints', 'steepest descent relaxation         ', 
+     *'conjugate gradient relaxation       ', 'constraint conjugate grad
+     *ient relaxation', 'Mulliken charge and atomic energy calculation',
+     * 'Option number 6 + prints out the eigenvectors', 'BFGS relaxation
+     * in internal coordinates', 'Option number 6 + Z-matrix input'/
+C
+      print *,'** dftb (version 26.11.1998) **'
+C
+C Get the machine accuracy
+C
+      racc = 1.0
+23000 if((1.0+racc) .gt. 1.0)then
+      racc = racc*0.5
+      goto 23000
+      endif
+23001 continue
+      racc = 2*racc
+
+C
+C Enter relaxation mode and fmax and scftol. Valid relaxation modes are
+C 1 ... MD with scaling of velocities according to temperature
+C 2 ... MD without scaling of velocities according to temperature
+C 3 ... Steepest descent (velocities are set to zero after each step)
+C 4 ... Conjugate gradient relaxation
+C 5 ... Constraint Conjugate gradient relaxation
+C 6 ... Mulliken analysis and atomic energy calculation
+C 7 ... Option number 6 + prints out the eigenvectors
+C 8 ... BFGS relaxation in internal coordinates
+C 9 ... Option number 6 + Z-matrix input
+C 10... Excitation spectrum via linear response
+C 11... Option 1, read old coordinates
+C 12... Option 2, read old coordinates
+C If the total force acting on each atom in the structure is smaller 
+C than fmax, the conjugate gradient or steepest descent routine is 
+C converged and the program terminates.
+C scftol is the convergence criterion for the charge SCF convergence.
+C
+      mdtemp = .false. 
+      mdfree = .false. 
+      stdc = .false. 
+      cgrmin = .false.
+      atomic = .false. 
+      evector = .false.
+      constr =.false.
+      lbfgs = .false.
+      lzmat = .false. 
+      lgrad = .true. 
+      lexc = .false.
+      readco = .false.
+      print *,'enter mode, fmax, scf, scftol, read charge,dispers,EXT'
+      read *,mode,fmax,scfhelp,scftol,chrr,dispers,ext
+      if(scfhelp)then
+      scftol=abs(scftol)
+      else
+      scftol=-abs(scftol)
+Cif (mode <= 0 ){
+C mode = -mode
+C constr=.true.
+C}
+      endif
+      if(mode .eq. 11 )then
+      readco = .true.
+      mode = mode - 10
+      endif
+      if(mode .eq. 12 )then
+      readco = .true.
+      mode = mode - 10
+      endif
+      if(mode .eq. 1)then
+      mdtemp = .true.
+      else
+      if(mode .eq. 2)then
+      mdfree = .true.
+      else
+      if(mode .eq. 3)then
+      stdc = .true.
+      else
+      if(mode .eq. 4)then
+      cgrmin = .true.
+Celse if (mode == 5) {
+C constr=.true.
+C cgrmin=.true.
+C }
+      else
+      if(mode .eq. 6)then
+      atomic = .true.
+      stdc = .true.
+      else
+      if(mode .eq. 7)then
+      atomic = .true.
+      stdc = .true.
+      evector = .true.
+      else
+      if(mode .eq. 8)then
+      lbfgs = .true.
+      else
+      if(mode .eq. 9)then
+      lbfgs = .true.
+      lzmat = .true.
+      else
+      if(mode .eq. 10)then
+      lgrad = .false.
+      lexc = .true.
+      else
+      print *,'invalid relaxation mode'
+      goto 9
+      endif
+      endif
+      endif
+      endif
+      endif
+      endif
+      endif
+      endif
+      endif
+      write(*,'(1x,2a)') 'relaxation mode: ',smode(mode)
+C
+C Read in name of structure file
+C
+      print *,'enter filename for input structure'
+      read *,infile
+C 
+C All lengths in a.u. = 5.292d-9 cm
+C
+      print *,'infile :',infile
+      open (1,file=infile,status='old')
+      rewind 1
+      write(*,*) 'Input total charge'
+      read(*,*) nel
+      write(*,*) 'Total charge set to ',nel
+      write(*,*) 'Number of moveable atoms'
+      read(*,*) nbeweg
+      if(nbeweg.eq.0)then
+      write(*,*) 'No constraints set.'
+      else
+      write(*,*) 'Number of moveable atoms set to ',nbeweg
+      endif
+
+
+cy 2007.12.22
+       nconst = 0
+      if(nbeweg.lt.0)then
+       nconst = - nbeweg
+      constr = .true.
+      write(*,*) nbeweg,'atoms to be constraint:'
+C read(*,*) conat(1)
+      conat(1) = -nbeweg
+      nbeweg = 0
+      write(*,*) 'Enter ',conat(1),' times: atom-number constraint-vecto
+     *r (x y z) :'
+
+Cput other constaraints: fix x,y,z Koordinate individually!
+C also changed end of eglcao.f
+C  norm=convec(1,i)*convec(1,i)+convec(2,i)*convec(2,i)+convec(3,i)*convec(3,i)
+
+      do i=1,conat(1) 
+        read(*,*) conat(i+1),(convec(j,i),j=1,3)
+        norm = 1.0
+        norm=sqrt(norm)
+        convec(1,i)=convec(1,i)/norm
+        convec(2,i)=convec(2,i)/norm
+        convec(3,i)=convec(3,i)/norm
+      enddo
+C
+C Read in coordinates and box parameters
+C
+Cif(lzmat) {
+C call zinput(1,nn,period,izp,xparam)
+C}
+Celse {
+      endif
+      call input(1,nn,period,izp,x,boxsiz,atnames)
+C}
+      if(nn .gt. nndim)then
+      print *,'dftb: nn > ', nndim
+      goto 9
+      endif
+      if(nbeweg.eq.0)then
+      nbeweg=nn
+      endif
+      n3 = 3*nn
+      nbew3 = 3*nbeweg
+C
+C calculate Inverse of Boxmatrix
+C
+      if(period)then
+      call inversebox
+      endif
+      close (1)
+C
+C Check if ntype in limits of MAXTYP 
+C
+      ntype = 1
+      do n = 1,nn 
+        if(izp(n) .gt. ntype)then
+         ntype = izp(n)
+        endif
+      enddo
+
+      if(ntype .gt. maxtyp)then
+        print *,'dftb: ntype >', maxtyp
+        goto 9
+      endif
+C
+C Read name of output file
+C
+      write (*,*) 'enter filename for output structure'
+      read *,outfile
+
+C Yasuhito Ohta: additional input data -------------------
+
+      read(*,*) adummy5, Tini, inr1, inr2
+      read(*,*) ivscale, iskip
+
+      read(*,*) iberendsen, btau
+      btau = btau * ps2au
+
+      read(*,*) iandersen, anu
+cy anu [1/ps]
+
+      read(*,*) ilangev, gamma_lgv
+      gamma_lgv = gamma_lgv/ps2au
+
+      read(*,*) inose, wnose
+cy wnose [cm^2]
+
+      read(*,*) ianose, awnose
+
+      write(*,'(a7,f12.2)') 'Tini = ', Tini 
+      write(*,'(a7,i5,a8,i5)') 'inr1 = ',inr1, ' inr2 = ', inr2
+      write(*,*) 'ivscale = ', ivscale
+      write(*,*) 'ilangev = ', ilangev
+      write(*,*) 'inose = ', inose
+      write(*,*) 'iandersen = ', iandersen
+      write(*,*) 'iberendsen = ', iberendsen
+C
+C Read in whether atom shall have a virtual atom at the same place,
+C i.e. wether you want an additional s (or p) orbital or not
+C
+      n3 = 3*nn
+      nbew3 = 3*nbeweg
+
+C Hier weitermachen 
+C
+C Read in maximal angular momentum for each type
+C 1,2,3  for  s,p,d, respectively
+C
+      write (*,*) 'enter ',ntype,' * lmax'
+      read *,(lmax(i),i = 1,ntype)
+C
+C Read in Slater-Koster-table 
+C
+      call gettab(ntype)
+C
+C nel is the net charge
+C nel=1, one electron missing
+C nel =-1 one electron more
+
+      nel = -nel
+      do i = 1,nn 
+        nel = nel+qzero(izp(i))
+      enddo
+
+      write(*,*) 'total number of electrons:', nel
+C
+C set charges
+      if(scfhelp)then
+        if(.not.chrr)then
+          do i = 1,nn 
+            qmat(i) = qzero(izp(i))
+          enddo
+        else
+
+        inquire(file="CHR.DAT",exist=ex)
+
+          if(ex)then
+            open(37,file="CHR.DAT",status="unknown")
+            do i=1,5 
+              read(37,*) tmpchr
+            enddo
+
+            do i=1,nn 
+              read(37,*) j,qmat(i)
+              if((qmat(i)-qzero(izp(i))).gt.1.0)then
+                write(*,*) 'warning: check charge on atom',i
+              endif
+            enddo
+            close(37)
+
+          else
+
+          do i = 1,nn 
+            qmat(i) = qzero(izp(i))
+          enddo
+
+          endif
+        endif
+      endif
+C
+C Get and check masses, data for repulsive part and next neighbours 
+C
+      do i = 1,ntype 
+        ar(1,i,i)=skhtab(1,1,i,i)
+        xm(i) = ar(1,i,i)
+        if(.not. cgrmin)then
+          if(xm(i) .lt. 0.1)then
+            write (*,*) 'mass of sort ',i,' is too small: ',xm(i)
+            goto 9
+          else
+            xmrc(i) = 1.0/(1822.887428*xm(i))
+          endif
+        endif
+
+        do j = 1,ntype 
+          do k = 2,10 
+            ar(k,i,j) = skhtab(k,1,i,j)
+          enddo
+            rmax(i,j) = skstab(1,1,i,j)
+        enddo
+
+      enddo
+
+CDISPERSION
+      if(dispers)then
+        call dispersionread(nn,ntype,izp,x)
+      endif
+CEND DISPERSION
+
+CCHARMM
+      if(ext.eq.'CH')then
+        open(98,file='EXTCHARGES.INP')
+        write(*,*) 'EXTCHARGES.INP'
+        write(*,*) 'number of external charges'
+        read(98,*) ne
+        write(*,*) ne,' times x,y,z,charge'
+
+        do i=1,ne 
+          read(98,*) (xe(j,i),j=1,3),ze(i)
+          do j=1,3 
+            xe(j,i)=xe(j,i)/0.529177
+          enddo
+        enddo
+
+      endif
+
+C same variables a for extcharges!
+CnEiter: ionic step, at which Field
+C is switched on
+
+      if(ext.eq.'EF')then
+        open(98,file='EXTFIELD.DAT')
+        write(*,*) 'EXTFIELD.DAT'
+        read(98,*) ne,neiter
+        write(*,*) '3 , icycle: when to switch field=',neiter
+        do i=1,ne 
+          read(98,*) xe(1,i),ze(i)
+          write(*,'(A20,2F12.6)') 'x0 , Ex = ',xe(1,i),ze(i)
+          xe(1,i)=xe(1,i)/0.529177
+        enddo
+      endif
+
+CEND CHARMM
+C Check boxsize according to the cutoff in SLK-data:
+C    the shortest distance of two vertices has to be twice the shortest
+C    cutoff
+C
+      slkcutoff=0.0d0
+
+      do i = 1,ntype 
+        do j = 1,ntype 
+         yhlp=sr(i,j)*dim(i,j)+0.3
+         if(yhlp.gt.slkcutoff)then
+           slkcutoff=yhlp
+         endif
+        enddo
+      enddo
+
+      skcut2=slkcutoff*slkcutoff
+
+      if(period)then
+        call gamma_summind(slkcutoff)
+        write(*,*) 'Number of lattice sums for 
+     &Gammapoint matrix:', nlat(1), nlat(2), nlat(3)
+        call initphi(boxsiz)
+      endif
+
+C Initialize random generator
+C Set up initial velocities and old coordinates
+C Take care: frozen coordinates must have xold(i) = x(i)
+C
+
+c Yasuhito Ohta -----------
+c     inr1 = 1802
+c     inr2 = 9373
+cy
+c     if( mdtemp .or. mdfree ) then
+c       call system('getrandom')
+c       open(15,file='seed.dat',status='old',err=999)
+c       read(15,*) inr1, inr2
+c       close(15)
+c     endif
+      call rmarin(inr1,inr2)
+
+      do i=1,nn
+        amass(i) = xm(izp(i)) * amu2au 
+      enddo
+
+      if( mdtemp .or. mdfree ) then
+        call  ini_velo(nbeweg,inr1,inr2,amass,Tini,velo)
+      endif
+
+c-------------------------
+
+
+        do i = 1,n3 
+          xold(i) = x(i)
+c 11/18
+c         write(*,*)  x(i)
+        enddo
+
+cy    if(.not.readco)then
+cy      if(mdtemp)then
+cy        do i = 1,nbew3 
+cy          xold(i) = x(i) - 0.1*(ranmar()-0.5)
+cy        enddo
+cy      endif
+cy    endif
+
+      if(readco)then
+        open(105,file='VELOC.DAT',status='old',err=998)
+cy      write(*,*) 'read old coordinates'
+        write(*,*) 'read old velocity'
+
+        do i=1,nn 
+cy        read(105,*) xold(3*i-2),xold(3*i-1),xold(3*i)
+          read(105,*,end=10) velo(3*i-2),velo(3*i-1),velo(3*i)
+        enddo
+
+cy Do not scale xold
+cy      do i =1,n3 
+cy        xold(i)=xold(i)/0.529177
+cy      enddo
+        close (105)
+      endif
+
+10    continue
+      close (105)
+
+cy constraint for velocity
+       if(constr) then
+        do i=1,conat(1)
+         ifix=conat(i+1)
+         velo(3*ifix-2) = velo(3*ifix-2)*convec(1,i)
+         velo(3*ifix-1) = velo(3*ifix-1)*convec(2,i)
+         velo(3*ifix)   = velo(3*ifix)*convec(3,i)
+        end do
+       endif
+C
+C Setup for relaxation loop
+C
+      icycle = 0
+      maxrun = 0
+      irun = 1
+      converge = .false.
+      e = 0.0
+      eel = 0.0
+      dxsmx = 0.0
+      fsmx = 0.0
+
+C Yasuhito Ohta ----
+      write (name,'(a,i4.4)') outfile(:index(outfile,' ')-1), icycle
+
+      if( mode.eq.1 .or. mode .eq.2 )then
+        write (namev,'(a,i4.4,a)') outfile(:index(outfile,' ')-1), 
+     &  icycle,'v'
+      endif
+
+cy xold -> velo
+      call outcoord(name, namev, nn, period, ntype, izp, x, velo, boxsiz
+     *, atnames,mode)
+c----------------------
+C
+C Start relaxation loop 
+C Multiple input lines are only allowed if (mdtemp), they do not make
+C sense in any other case. There would be a problem with xold if the
+C time stepwidth is changed since xold is with respect to the old time
+C stepwidth. However, since vnorm is always called in the first step,
+C xold will be set to a reasonable value. 
+C
+C BFGS optimization in internal coordinates starts here
+      if(lbfgs)then
+        write(*,*) 'this mode is not available'
+        stop
+      endif
+C19 continue
+C  call bfgs(n3,telec,x,xparam,scftol,atomic,e,eel,gr,niter#       ,evector,qmat
+C,fmax,izp,lzmat,lexc,nexc,nrem)
+C  converge = .true.
+C  icycle=  icycle+1 
+C  goto 8
+
+C===================================================
+CYasuhito Ohta: iMDstep is introduced. 
+
+      iMDstep = 0
+      etotal = 0.0d0
+
+      if(mdtemp .or. mdfree )then
+        ekin = 0.0d0
+        do n=1,nbew3
+          ekin = ekin + 0.5d0*velo(n)*velo(n)*amass((n+2)/3)
+        enddo
+      endif
+
+
+      do k=1,3
+       xnose(k) = 1.0d0
+       vnose(k) = 0.0d0
+       gnose(k) = 0.0d0
+      enddo
+
+      do n=1,nbeweg
+       do k=1,3
+         xnose_atm(k,n) = 1.0d0
+         vnose_atm(k,n) = 0.0d0
+         gnose_atm(k,n) = 0.0d0
+       enddo
+      enddo
+
+      Btot = 0.0d0
+
+
+C==================================================
+
+C for all other, go into this loop
+C MD loop starts from here
+23108 continue
+
+      iMDstep = iMDstep + 1
+      if(irun .gt. maxrun)then
+        icycle = icycle+1
+        irun = 1
+        if((lcc.ne.0).and.(maxrun.ne.0) )then
+          rccval = rccval + rccinc
+          converge = .false.
+          if(cgrmin)then
+            call cgrad(3,nbew3,fmax,e,x,gr)
+          endif
+        endif
+
+cy constraint for velocity
+       if(constr) then
+        do i=1,conat(1)
+         ifix=conat(i+1)
+         velo(3*ifix-2) = velo(3*ifix-2)*convec(1,i)
+         velo(3*ifix-1) = velo(3*ifix-1)*convec(2,i)
+         velo(3*ifix)   = velo(3*ifix)*convec(3,i)
+        end do
+       endif
+C
+C Close cgrad files and leave
+C
+      if((irun .gt. 1) .and. (.not. mdtemp) .and. 
+     &  (.not. mdfree) .and. (lcc.eq.0))then
+        icgr = 1
+        if(cgrmin)then
+          call cgrad(icgr,nbew3,fmax,e,x,gr)
+        endif
+        goto 9
+      endif
+C
+C
+C Read in deltat, tatom, telec, wvscale, maxrun
+C deltat is the time stepwidth in 2.4189d-17 s. tatom is the temperature
+C of the atomar system, telec the the temperature of the electronic
+C system, both in K. wvscale is the probability to rescale the
+C velocities after each step according to the temperature. It may be
+C seen as a simple coupling parameter between the system and a
+C heat reservoir. maxrun is maximum number of steps to perform
+C in that cycle.
+C
+      dorelax = .true. 
+      doecalc = .true.
+
+      write (*,*) 'enter deltat, tatom, telec, wvscale, maxrun'
+
+C Yasuhito Ohta -------------------------------
+      write(*,*) 'e(total) = eband + erep'
+
+      read (*,*,end = 9) deltat, tatom, telec, wvscale, maxrun
+      Tc = tatom
+
+C--------------------------------------------
+
+      if(lexc)then
+        read(*,*) nexc,nrem
+      endif
+
+      if(mdfree .and. (icycle .ne.1))then
+        write(*,*) 'careful: same timestep?'
+      endif
+
+      if(atomic)then
+        deltat = 0.0
+        maxrun = 0.0
+      endif
+
+      delth2 = deltat**2
+      if(telec .gt. 5.0 .and. maxrun.gt.1)then
+        write(*,*) 
+     &  'Warning: Relaxation with finite electron temperature may not'
+         write(*,*) '         lead to the right result!'
+      endif
+
+C
+C Check if deltat is greater than zero 
+C
+      if(deltat .lt. 1.0d-10)then
+        dorelax = .false. 
+        if(maxrun .gt. 0)then
+          maxrun = 0
+          print *,'maxrun has been set to 0'
+        endif
+      else
+
+      rcdt = 1.0/deltat
+
+      endif
+
+      if(maxrun .lt. 0)then
+        doecalc = .false.
+
+C FOR MD! change if you read velocities or
+C do multiple input lines for MD: then do not
+C use mdcorrect every icycle
+C     if (mdtemp || mdfree) mdcorr = .true. ; else mdcorr = .false.
+      endif
+
+      if(mdtemp)then
+        mdcorr = .true. 
+      else
+        mdcorr = .false.
+      endif
+
+      if(mdfree .and. (icycle.eq.1) .and. (.not.readco))then
+        mdcorr = .true.
+      endif
+
+      if(icycle .eq. 1 )then
+
+      open(95,file='ENERGY.TMP',form='formatted', status='unknown')
+C,access='append')
+
+      if( mode.eq.1 .or. mode.eq.2)then
+        write (*,11)
+        write (95,11)
+      else
+        write (*,12)
+        write (95,12)
+C    close(95)
+      endif
+      endif
+      endif
+C
+C Done with setup
+C
+      if(dorelax .and. (.not. cgrmin))then
+C
+C Mass centre --> 0,0,0
+C  
+C   if (! constr ){
+      if(ext.eq.'NO')then
+        if(deltat .gt. 1.0d-10)then
+         call xnorm(nn,x,xold,xm,izp)
+        endif
+      endif
+C   }
+C
+C All atoms back into the supercell
+C
+        if(period)then
+          do i = 1,nn 
+            call coordback(x(3*i-2),x(3*i-1),x(3*i),
+     &                 xold(3*i-2),xold(3*i-1),xold(3*i))
+          enddo
+        endif
+      endif
+C
+C Set total impulse = 0, scale velocities according to temperature
+C Velocities must always be scaled in the first step
+C
+
+cy Yasuhito Ohta: (vscale .eq. 1) is added -------
+ 
+      if(dorelax .and. mdtemp .and. (ivscale .eq. 1) )then
+        if( mod(iMDstep,iskip) .eq. 0 ) then
+cy      if(irun .eq. 1)then
+          write(*,*) 'rescale velocities'
+        endif
+
+cy  vnorm is not used. -------
+cy if( irun .eq. 1 ) -> if( mod(iMDstep,iskip) .eq. 0 )
+
+        if( mod(iMDstep,iskip) .eq. 0 ) then
+cy      if( irun .eq. 1 )then
+cy        call vnorm(nbeweg,x,xold,tatom,deltat,xm,izp)
+          call velo_scale(nbeweg,Tini,amass,velo,vscale)
+
+
+        endif
+      endif
+
+      if(dorelax .and. mdtemp .and. (ivscale .eq. 1) )then
+        if(ranmar() .lt. wvscale)then
+          write(*,*) 'ranmar() < wvscale'
+          mdcorr = .true.
+
+cy  vnorm is not used. -------
+cy        call vnorm(nbeweg,x,xold,tatom,deltat,xm,izp)
+          call velo_scale(nbeweg,Tatom,amass,velo,vscale)
+        endif
+      endif
+C
+C If (! doecalc), skip energy evaluation and geometry update
+C
+      if(.not. doecalc)then
+        goto 7
+      endif
+
+C Yasuhito Ohta ============================================ 
+
+       etotal_old = etotal
+
+cy Berendsen thermostat 1 -----------
+
+      if( mdtemp .and. (iberendsen .eq. 1) )then
+        call berendsen(nbew3,amass,btau,Tc,temp_atom,deltat,velo)
+      endif
+
+cy Nose Hoover chain thermostat 1 ----------
+      if( mdtemp .and. (inose .eq. 1) )then
+        call Nose_Hoover_chain(nbeweg,nconst,amass,deltat,Tc,velo,Btot,
+     &                       gnose,vnose,xnose,wnose)
+      endif
+
+cy Atom-by-atom Nose Hoover chain thermostat 1 ----------
+      if( mdtemp .and. (ianose .eq. 1) )then
+        call ANHC(nbeweg,nconst,amass,deltat,Tc,velo,Btot_all,
+     &                      gnose_atm,vnose_atm,xnose_atm,awnose)
+      endif
+cy ------
+
+      if(mdtemp .or. mdfree)then
+        do n=1,nbew3
+          velo(n)=velo(n)+ 0.5d0*deltat*(-gr(n))/amass((n+2)/3)
+        enddo
+
+        do n=1,nbew3
+         x(n) = xold(n) + deltat*velo(n)
+        enddo
+      endif
+
+
+C
+C Do the work (total energy, gradient)
+C
+      call eglcao(n3,telec,x,scftol,atomic,e,eel,gr,niter,
+     &            evector,qmat,lgrad,lexc,nexc,nrem,entropy)
+
+cy Langevin thermostat ----------------
+      if( mdtemp .and. (ilangev .eq. 1) )then
+        call langevin(nbew3,amass,gamma_lgv,Tatom,deltat,velo,gr)
+      endif
+cy ----------------
+
+
+
+      if(mdtemp .or. mdfree)then
+        do n=1,nbew3
+          velo(n)=velo(n)+ 0.5d0*deltat*(-gr(n))/amass((n+2)/3)
+        enddo
+      endif
+
+
+
+cy Nose Hoover chain thermostat 2 ----------
+      if( mdtemp .and. (inose .eq. 1) )then
+        call Nose_Hoover_chain(nbeweg,nconst,amass,deltat,Tc,velo,Btot,
+     &                       gnose,vnose,xnose,wnose)
+      endif
+
+cy Atom-by-atom Nose Hoover chain thermostat 2 ----------
+      if( mdtemp .and. (ianose .eq. 1) )then
+        call ANHC(nbeweg,nconst,amass,deltat,Tc,velo,Btot_all,
+     &                      gnose_atm,vnose_atm,xnose_atm,awnose)
+      endif
+cy ------
+
+cy Berendsen thermostat 2 --------------------------
+
+      if( mdtemp .and. (iberendsen .eq. 1) )then
+        call berendsen(nbew3,amass,btau,Tc,temp_atom,deltat,velo)
+      endif
+
+cy Andersen thermostat ---------------
+
+      if( mdtemp .and. (iandersen .eq. 1) )then
+        call andersen(nbeweg,nbew3,amass,anu,Tc,deltat,velo)
+      endif
+
+      if(mdtemp .or. mdfree)then
+        ekin = 0.0d0
+        do n=1,nbew3
+          ekin = ekin + 0.5d0*velo(n)*velo(n)*amass((n+2)/3)
+        enddo
+      endif
+
+      etotal = ekin + e
+
+      if( mdtemp .and. (inose .eq. 1) ) then
+         etotal = etotal + Btot
+      endif
+
+      if( mdtemp .and. (ianose .eq. 1) ) then
+         etotal = etotal + Btot_all
+      endif
+
+      error =  abs(etotal - etotal_old)
+      if(iMDstep .eq. 1 ) error = 0.0d0
+      temp_atom =  (2.0d0*ekin)/((nbew3 - 3.0d0*nconst)*rKb)
+     
+C
+C Output of necessary imnformation (forces, masses, etc.) for vibrational modes
+C
+C
+C if (atomic) {
+      call outforces(nbeweg,izp,gr,xm)
+C }
+C
+C Calculate fsmx, the maximal force acting on a single atom
+C
+      fsmx = 0.0
+      do i = 1,nbeweg 
+        ftmp = 0.0
+        do j = -2,0 
+          ftmp = ftmp + gr(3*i+j)**2
+        enddo
+
+        ftmp = sqrt(ftmp)
+        fsmx = max(fsmx,ftmp)
+      enddo
+
+C
+C Check if conjugate gradient or stdc method is converged
+C Setup icgr
+C If (converge && cgrmin), delete file cgrad 
+C
+      if(stdc .or. cgrmin)then
+        if(fsmx .lt. fmax)then
+          converge = .true.
+        endif
+      endif
+
+      icgr = 0
+
+      if(converge)then
+        icgr = 2
+      endif
+
+      if(converge .and. cgrmin)then
+        call cgrad(icgr,nbew3,fmax,e,x,gr)
+      endif
+C
+C If (converge || (! dorelax)), skip geometry update
+C
+      if(converge .or. (.not. dorelax))then
+        goto 7
+      endif
+C
+C Geometry update (conjugate gradient, stdc or verlet)
+C Hint: When using the Verlet algorithm and velocities at the same 
+C time, we have a problem. The time dependence of x can be written as
+C
+C (1)  x(t+dt) = x(t) + v(t)*dt + 0.5*dt*dt*f(t)/m
+C
+C When we use Verlet, we approximate v(t) pretty reasonable as
+C
+C (2)  v(t) = (x(t+dt)-x(t-dt))/(2*dt)
+C 
+C Substituting (2) in (1) leads to the Verlet formula
+C 
+C (3)  x(t+dt) = 2*x(t) - x(t-dt) + dt*dt*f(t)/m
+C
+C This geometry update is due to v(t) and f(t). That means, we have the
+C coordinates for x(t+dt), but not the velocities. But we desperately 
+C need these velocities to determine the temperature of the system.
+C Thus we have to make a compromise: use v(t+dt) = (x(t+dt) - x(t))/dt 
+C to determine the temperature and to rescale the velocities.
+C There is one more thing to take care of: There are a lot of cases when
+C we exactly know v(t): either in the very first step of the MD simulation
+C or after we did a rescaling of the velocities according to the current
+C temperature. In either case, we have determined the velocity of the 
+C atoms using the formula v(t) = (x(t)-x(t-dt))/dt, which is in
+C contrast to (2). However, after calling eglcao we know f(t) and
+C are able to correct for this error by resetting x(t-dt) according to
+C
+C (4)  x(t-dt) = x(t-dt) + 0.5*f(t)/m
+C
+C This is what is done in the next loop. It is executed if (irun == 1) 
+C or if vscale has been called.
+C Since the gradient of the frozen coordinates has already been set to
+C zero, they will not be changed.
+C
+
+c Yasuhito Ohta: xold is not used --------
+cy    if(mdcorr )then
+cy      mdcorr = .false.
+cy      write(*,*) 'mdcorrect: correct velocities'
+cy      do i = 1,nbew3 
+cy        xold(i) = xold(i) + 0.5*delth2*gr(i)*xmrc(izp((i+2)/3))
+cy      enddo
+cy    endif
+
+C
+C Now start with the actual geometry update
+C dxsmx is the maximal displacement of a single atom
+C
+cy    ekin = 0.0
+      dxsmx = 0.0
+
+      if(cgrmin .or. stdc)then
+
+        if(cgrmin)then
+          call cgrad(icgr,nbew3,fmax,e,x,gr)
+        else
+         do i = 1,nbew3 
+           x(i) = xold(i) - delth2*gr(i)*xmrc(izp((i+2)/3))
+         enddo
+        endif
+
+        do i = 1,nbeweg 
+          dxtmp = 0.0
+          do j = -2,0 
+            dxtmp = dxtmp + (x(3*i+j)-xold(3*i+j))**2
+            xold(3*i+j) = x(3*i+j)
+          enddo
+          dxtmp = sqrt(dxtmp)
+          dxsmx = max(dxsmx,dxtmp)
+        enddo
+ 
+      else
+ 
+        if(mdtemp .or. mdfree)then
+cy       do i = 1,nbew3 
+cy         xv = 2*x(i) - xold(i) - delth2*gr(i)*xmrc(izp((i+2)/3))
+cy         ekin = ekin +
+cy   &            0.5*(xv-xold(i))**2/ (4*delth2*xmrc(izp((i+2)/3)) )
+cy         xold(i) = x(i)
+cy         x(i) = xv
+cy       enddo
+cy
+         do i = 1,nbeweg 
+  
+            dxtmp = 0.0
+  
+           do j = -2,0 
+             dxtmp = dxtmp + (x(3*i+j)-xold(3*i+j))**2
+           enddo
+  
+           dxtmp = sqrt(dxtmp)
+           dxsmx = max(dxsmx,dxtmp)
+  
+         enddo
+       endif
+
+      endif
+C
+C create neighbour table, get number of atoms without
+C neighbours
+C
+7     nfree = 0
+C
+C normalize coordinates if one cycle is complete
+C
+      if(converge .or. (irun .ge. maxrun))then
+        if(dorelax .and. (.not.cgrmin) )then
+          if(ext.eq.'NO')then
+            call xnorm(nn,x,xold,xm,izp)
+          endif
+        endif
+      endif
+
+C calculate atomization energy
+      geseatom=0.0
+      do i=1,nn 
+        geseatom = geseatom+espin(izp(i))
+      enddo
+
+c Yasuhito Ohta : update xold --------------
+
+      do i=1,n3
+        xold(i) = x(i)
+      enddo
+c------------------------------------------
+
+
+
+C
+C
+C output to stdout
+C
+C  open(95,file='ENERGY.TMP',form='formatted',#    status='unknown')
+C,access='append')
+      if( mode.eq.1 .or. mode .eq.2)then
+      write (*,13) icycle,irun,niter,e,eel,(e-geseatom)*627.5095,
+     &             edis, ekin,ekin+e
+
+
+
+      write (95,13) icycle,irun,niter,e,eel,(e-geseatom)*627.5095,edis, 
+     *ekin,ekin+e
+      else
+      write (*,13) icycle,irun,niter,e,eel,(e-geseatom)*627.5095,edis,
+     &             dxsmx, fsmx
+      write (95,13) icycle,irun,niter,e,eel,(e-geseatom)*627.5095,edis,
+     &             dxsmx, fsmx
+      endif
+
+      if( (converge.or.(irun.eq.maxrun)) .and. (lcc.ne.0) )then
+        write(*,'(A10,2I5,6F12.4)') ' constr',icycle,irun, 
+     &     rccval*0.529177,e,e*627.5095,(e-geseatom)*627.5095,
+     &     (e-eel)*627.5095,fsmx
+        write(95,'(A10,2I5,6F12.4)') ' constr',icycle,irun,
+     &  rccval*0.529177,e,e*627.5095,(e-geseatom)*627.5095,
+     &  (e-eel)*627.5095,fsmx
+        irun = maxrun+1
+      endif
+
+CYasuhito Ohta: 
+      if( mode.eq.1 .or. mode .eq.2)then
+        if( mod(imdstep, maxrun) .eq. 0 )then
+          TeS = telec * entropy
+          write(*,*) '---------------------------------------'
+          write(*,'(a15,I10)') 'MD step = ', iMDstep
+          write(*,'(a15,I10,D16.6)') 'TeS ',iMDstep, TeS
+          write(*,'(a15,I10,D16.6)') 'E-TeS ',iMDstep, e-TeS
+          write(*,'(a15,I10,F9.2)') 'temp_atom ',iMDstep, temp_atom 
+          write(*,'(a15,I10,3D18.6)')'etot,ekin,epot ',
+     &                                       iMDstep,e+ekin,ekin,e
+          write(*,'(a15,I10,D16.6)') 'ediff ',iMDstep,error
+          write(*,*) '---------------------------------------'
+C
+C  close(95)
+C
+C output to structure outputfile
+C
+        endif
+      endif
+
+      irun = irun+1
+8     continue
+      write (name,'(a,i4.4)') outfile(:index(outfile,' ')-1), icycle
+      if( mode.eq.1 .or. mode .eq.2 )then
+      write (namev,'(a,i4.4,a)') outfile(:index(outfile,' ')-1), icycle,
+     *'v'
+      endif
+
+      if( mode .eq. 3 )then
+C  write (name,'(a,i4.4)') outfile(:index(outfile,' ')-1), irun
+C  if(lzmat) {
+C   call zoutput(name,izp,xparam)
+C  }
+C  else {
+      endif
+
+C Yasuhito Ohta: xold -> velo
+      call outcoord(name, namev, nn, period, ntype, izp, x, velo, boxsiz
+     *, atnames,mode)
+C  }
+      if(converge .and. (lcc.eq.0) )then
+      goto 9
+C  if (lbfgs && (lcc!=0)) goto 19
+C
+      endif
+C end irun loop
+C
+C end of relaxation loop
+C
+23109 goto 23108
+23110 continue
+9     continue
+C
+C format specifications
+C
+11    format(/2x,'icycle iter niter',6x,'e(total)',5x,'e(bandstr)', 5x,'
+     *e(bind[kcal])',4x,'Edis',8x, 'ekin',9x,'etot'/,1x,105('='))
+12    format(/2x,'icycle iter niter',6x,'e(total)',5x,'e(bandstr)', 5x,'
+     *e(bind[kcal])',4x,'Edis',8x,'deltax(max)',6x,'f(max)'/, 1x,105('='
+     *))
+C            'ekin',9x,'etot'/,1x,135('='))
+C13 format(i5,1x,i5,' / ',i2,3(1x,f14.6),1x,f14.6,4(1x,f14.6))
+
+CYasuhito Ohta: i2 -> i3
+13    format(i5,1x,i5,' / ',i3,3(1x,f14.6),1x,f14.6,2(1x,f14.6))
+      print *,' '
+      print *,'***** end of dftb *****'
+      goto 1000
+
+ 998  write(*,*) 'There is no VELOC.DAT '
+      goto 1000
+ 999  write(*,*) 'There is no RANDOM_SEED '
+      goto 1000
+
+1000  continue
+      end
+C********************************************************
+      subroutine ini_velo(NATM,inr1,inr2,amass,temp,velo)
+C********************************************************
+      implicit doubleprecision(a-h,o-z)
+      parameter(pi=3.1415926535897932)
+      parameter(rKb=3.16683D-6)
+      real*8 velo(3,*),amass(*)
+
+      rkT = temp*rKb
+      Emax = 1.5d0*rkT*5.0d0
+
+       do n=1,NATM
+ 
+
+5       r1 = ranmar()
+        r2 = ranmar()
+        r3 = ranmar()
+        r4 = ranmar()
+
+
+         vx = sqrt( rkT/amass(n) )
+     &              *sqrt( -2.0d0*log(r1) )*cos(2.0d0*pi*r2)
+   
+         vy = sqrt( rkT/amass(n) )
+     &              *sqrt( -2.0d0*log(r1) )*sin(2.0d0*pi*r2)
+
+         vz = sqrt( rkT/amass(n) )
+     &               *sqrt( -2.0d0*log(r3) )*cos(2.0d0*pi*r4)
+
+           EK = 0.5d0*amass(n)*( vx**2 + vy**2 + vz**2 )
+
+         if( EK .ge. Emax ) goto 5
+
+          velo(1,n) = vx
+          velo(2,n) = vy
+          velo(3,n) = vz
+
+      enddo
+
+      return
+      end
+C============================================================
+      subroutine velo_scale(np,Tc, amass,velo,vscale)
+C============================================================
+      implicit doubleprecision(a-h,o-z)
+      parameter(rKb=3.16683D-6)
+      real*8 amass(*), velo(3,*)
+ 
+      ekin = 0.0d0
+      do n=1,np
+       do k=1,3
+         ekin = ekin + 0.5d0*amass(n)*velo(k,n)*velo(k,n)
+       enddo
+      enddo
+
+      temp = 2.0d0*ekin/(3.0d0*np*rKb)
+      vscale = sqrt(Tc/Temp)
+
+      do n=1,np
+        do k=1,3
+          velo(k,n) = velo(k,n) * vscale
+        enddo
+      enddo
+ 
+      return
+      end
+C**********************************************************************
+      subroutine langevin(nbew3,amass,gamma,Tatom,dt,velo,gr)
+C**********************************************************************
+      implicit none
+      integer n,nbew3,nth_atm
+      real*8 ran1,ran2,ranmar,distrib,pi,const,rKb,Tatom,dt
+      real*8 gamma,random_frc,frc_langev,gr(*),amass(*),velo(*)
+      parameter(pi = 3.1415926535897932d0)
+      parameter(rKb=3.16683D-6)
+C gamma is damping factor
+
+      do n=1,nbew3
+        nth_atm=(n+2)/3
+        ran1 = ranmar()
+        ran2 = ranmar()
+
+        distrib = sqrt( -2.0d0*log(ran1) ) * cos(2.0d0 * pi * ran2 )
+
+        const = 2.0d0 * amass(nth_atm) * gamma * rKb * Tatom
+
+        random_frc = distrib * sqrt( const / dt ) 
+
+        frc_langev = - gamma * amass(nth_atm) * velo(n) 
+     &               + random_frc 
+
+        gr(n) = gr(n) - frc_langev  
+c note:  force(n) = force(n) + frc_langev, where force(n) = - gr(n)
+
+      enddo
+
+      return
+      end
+C**********************************************************************
+      subroutine berendsen(nbew3,amass,btau,Tc,temp_atom,dt,velo)
+C**********************************************************************
+      implicit none
+      integer n,nbew3
+      real*8 ekin,rKb
+      parameter(rKb=3.16683D-6)
+      real*8 bgamma,btau,Tc,temp_atom,dt,velo(*),amass(*)
+
+      ekin = 0.0d0
+      do n=1,nbew3
+       ekin = ekin + 0.5d0*amass((n+2)/3)*velo(n)*velo(n)
+      enddo
+
+      temp_atom =  (2.0d0*ekin)/(nbew3*rKb)
+
+      bgamma = (0.5d0/btau)*(Tc/temp_atom - 1.0d0 )
+
+      do n=1,nbew3
+        velo(n) = velo(n) * exp(0.5d0*dt*bgamma)
+      enddo
+
+      return
+      end
+C**********************************************************************
+      subroutine andersen(nbeweg,nbew3,amass,anu,Tc,dt,velo)
+C**********************************************************************
+      implicit none
+      integer n,nbeweg,nbew3
+      real*8 pi,rKb,au2sec,au2fs,fs2au,au2ps,ps2au
+      parameter(pi=3.1415926535897932d0,rKb=3.16683D-6)
+c see http://en.wikipedia.org/wiki/Atomic_units
+      parameter(au2sec=2.418884326505d-17)
+      parameter(au2fs=au2sec*1.D15,fs2au=1.0d0/au2fs)
+      parameter(au2ps=au2sec*1.D12,ps2au=1.d0/au2ps)
+      real*8 anu,Tc,dt,velo(*),coeff,r1,r2,r3,ranmar,amass(*),factor
+
+c     do n=1,nbew3
+c      coeff = sqrt( rKb * Tc /amass((n+2)/3) )
+c      if( ranmar() .le. anu*dt*au2ps ) then
+c        r1 = ranmar()
+c        r2 = ranmar()
+c        factor = sqrt( -2.0d0 * log(r1) )
+c        velo(n) =  coeff * factor * cos(2.0d0*pi*r2)
+c      endif
+c     enddo
+
+      do n=1,nbeweg
+       coeff = sqrt( rKb * Tc /amass(n) )
+       if( ranmar() .le. anu*dt*au2ps ) then
+         r1 = ranmar()
+         r2 = ranmar()
+         r3 = ranmar()
+         factor = sqrt( -2.0d0 * log(r1) )
+         velo(3*n-2) =  coeff * factor * cos(2.0d0*pi*r2)
+         velo(3*n-1) =  coeff * factor * sin(2.0d0*pi*r2)
+         velo(3*n)   =  coeff * factor * cos(2.0d0*pi*r3)
+       endif
+      enddo
+
+      return
+      end
+C**********************************************************************
+      subroutine local_vscale(nbeweg,amass,anu,Tc,dt,velo)
+C**********************************************************************
+C This routine does not work
+      implicit none
+      integer n,nbeweg
+      real*8 pi,rKb,au2sec,au2fs,fs2au,au2ps,ps2au
+      parameter(pi=3.1415926535897932d0,rKb=3.16683D-6)
+c see http://en.wikipedia.org/wiki/Atomic_units
+      parameter(au2sec=2.418884326505d-17)
+      parameter(au2fs=au2sec*1.D15,fs2au=1.0d0/au2fs)
+      parameter(au2ps=au2sec*1.D12,ps2au=1.d0/au2ps)
+      real*8 anu,Tc,dt,velo(*),ranmar,amass(*)
+      real*8 ekin_1atm, temp_1atm, vx2,vy2,vz2
+      real*8 ekin,temp
+
+      ekin = 0.0d0
+      do n=1,nbeweg
+
+       if( ranmar() .le. anu*dt*au2ps ) then
+
+         vx2 = velo(3*n-2)*velo(3*n-2)
+         vy2 = velo(3*n-1)*velo(3*n-1)
+         vz2 = velo(3*n)*velo(3*n)
+
+         ekin_1atm =  0.5d0 * amass(n) * ( vx2 + vy2 + vz2 )
+         temp_1atm = ( 2.0d0 * ekin_1atm ) / ( 3.0d0 * rKb )
+         velo(n) =  velo(n) * sqrt( Tc/ temp_1atm )
+
+         ekin = ekin + 0.5d0*amass(n)* ( vx2 + vy2 + vz2 )
+
+       endif
+
+      enddo
+
+c     temp = ( 2.0d0 * ekin ) / ( 3.0d0 * nbeweg * rKb )
+c     do n=1,nbeweg*3
+c       velo(n) =  velo(n) * sqrt( Tc/ temp )
+c     enddo
+
+      return
+      end
+C******************************************************************
+      subroutine Nose_Hoover_chain(np,nconst,amass,dt,Tset,velo,Btot,
+     &                             gnose,vnose,xnose,wnose)
+C******************************************************************
+      implicit doubleprecision(a-h,o-z)
+      parameter(toEh=3.16683D-6, nn = 3 )
+      real*8 velo(3,*), amass(*), gnose(nn)
+      real*8 w(nn), wdti(nn), wdti2(nn), wdti4(nn), wdti8(nn)
+      real*8 xnose(nn), vnose(nn), Qmass(nn)
+
+      ekin = 0.0d0
+      do n=1,np
+       do k=1,3
+         ekin = ekin + 0.5d0*amass(n)*velo(k,n)*velo(k,n)
+       enddo
+      enddo
+
+        gkt    = Tset*toEh
+        gnkt   = 3.0d0*(np-nconst)*gkt
+
+          nnos       = 3
+          nnos1      = nnos + 1
+
+c wnose is effective frequency
+c         wnose      = 1000.0d0
+          wp         = wnose/219474.0d0
+
+c qm is effective mass, where dimension is M*L^2
+          qm         = gnkt/wp**2.0d0
+
+            Qmass(1) = qm
+          do i=2,nnos
+            Qmass(i) = qm/(np*3.0d0)
+          enddo
+
+
+          nyosh      = 3
+          nresn      = 1
+
+          w(1) = 1.0d0/(2.0d0 - 2.0**(1.0d0/3.0d0) )
+          w(2) = 1.0d0 - 2.0d0*w(1)
+          w(3) = w(1)
+          
+          do j=1, nyosh
+           wdti(j)  = w(j)*dt/nresn
+           wdti2(j) = wdti(j)/2.0d0
+           wdti4(j) = wdti(j)/4.0d0
+           wdti8(j) = wdti(j)/8.0d0
+          enddo
+          
+       scale = 1.0d0
+
+        AKIN = 2.0d0*EKIN
+
+       gnose(1) = (AKIN - gnkt)/Qmass(1)
+
+
+       do 15 iresn = 1, nresn
+         do 10 iyosh = 1, nyosh
+
+           vnose(nnos) = vnose(nnos) + gnose(nnos)*wdti4(iyosh)
+	
+           do inos = 1, nnos - 1
+
+             AA = exp( -wdti8(iyosh)*vnose(nnos1-inos))
+             vnose(nnos-inos) = vnose(nnos-inos)*AA*AA
+     &                        + wdti4(iyosh)*gnose(nnos-inos)*AA
+           enddo
+
+           AA = exp( -wdti2(iyosh)*vnose(1) )
+           scale = scale*AA
+
+           gnose(1) = ( scale*scale*akin - gnkt )/Qmass(1)
+
+           do inos = 1, nnos
+             xnose(inos) = xnose(inos)+ vnose(inos)*wdti2(iyosh)
+           enddo
+
+           do inos = 1, nnos - 1
+             AA = exp( -wdti8(iyosh)*vnose(inos+1) )
+             vnose(inos) = vnose(inos)*AA*AA
+     &                   + wdti4(iyosh)*gnose(inos)*AA
+
+             gnose(inos + 1) = ( Qmass(inos)*vnose(inos)
+     &                       *vnose(inos) - gkt )/Qmass(inos + 1 )
+           enddo
+
+           vnose(nnos) = vnose(nnos) + gnose(nnos)*wdti4(iyosh)
+
+   10    continue
+  15  continue
+
+       do i = 1, np
+        do j = 1, 3
+         velo(j,i) = velo(j,i)  *  scale
+        enddo
+       enddo
+
+
+        BKIN = 0.0d0 
+       do i = 1, nnos
+        BKIN = BKIN + 0.5d0*Qmass(i)*vnose(i)**2
+       enddo        
+
+       Btot =  BKIN + gnkt*xnose(1)
+       do i=2,nnos
+         Btot =  Btot   + gkt*xnose(i)
+       enddo
+
+       return
+       end
+C**********************************************************************
+       subroutine ANHC(nbeweg,nconst,amass,deltat,Tc,velo,Btot_all,
+     &             gnose_atm,vnose_atm,xnose_atm,wnose)
+C**********************************************************************
+C Atom-by-atom Nose-Hoover chain thermostat
+       implicit doubleprecision(a-h,o-z)
+       integer ione
+       parameter(ione = 1)
+       real*8 amass(*),velo(3,*)
+       real*8 gnose_atm(3,*),vnose_atm(3,*),xnose_atm(3,*)
+       real*8 xnose(3),vnose(3),gnose(3),atm_velo(3)
+
+       Btot_all = 0.0d0
+       do n=nconst+1,nbeweg
+
+         atm_mass = amass(n)
+
+         do k=1,3
+           xnose(k) = xnose_atm(k,n)
+           vnose(k) = vnose_atm(k,n)
+           gnose(k) = gnose_atm(k,n)
+           atm_velo(k) = velo(k,n)
+         enddo
+
+         nconst_dummy=0
+         call Nose_Hoover_chain(ione,nconst_dummy,atm_mass,deltat,Tc,
+     &        atm_velo,Btot,gnose,vnose,xnose,wnose)
+
+          Btot_all = Btot_all + Btot
+
+         do k=1,3
+           xnose_atm(k,n) = xnose(k)
+           vnose_atm(k,n) = vnose(k)
+           gnose_atm(k,n) = gnose(k)
+           velo(k,n) = atm_velo(k)
+         enddo
+
+       enddo
+
+       return
+       end
+

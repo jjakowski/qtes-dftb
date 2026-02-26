@@ -1,0 +1,109 @@
+
+
+
+old pbdftb  (B523): 
+------------
+1)  potent.f   <-- main
+2)  derivs.f   <--  for compatibility with Bohm 
+3) pbdylcao.f  <-- main porgrma   pdylcao.f   converted into subroutine
+4)   GNUmakefile
+
+
+2012-06-09
+-----------
+There seems to be some problems with OMP forces  with GNU compiler. 
+PGI gives OK forces (as comparedwith unmodified   ~/Development/dftb/src_dev2-new/dftb   code.
+
+j2c@jackaroo:~/Development/bohm/dftb/120424/src3> cp my_gradient.f  my_gradient.f-check-OMP-BUG
+
+
+
+-----correct results for CH4 :---------
+/1=C,2=H/
+ .... done with dftb_init
+ Nat = ?
+ Nat =           5
+ ***** C :
+     1 0.0000000000000000E+00 0.0000000000000000E+00 0.0000000000000000E+00 
+     2 0.1000000000000000E+01 0.0000000000000000E+00 -.5000000000000000E+00 
+     2 -.7000000000000000E+00 0.7000000000000000E+00 -.5000000000000000E+00 
+     2 -.7000000000000000E+00 -.7000000000000000E+00 -.5000000000000000E+00 
+     2 0.1100000000000000E+01 0.0000000000000000E+00 0.0000000000000000E+00 
+ telec, scftol, qnel = ?
+   100000.00000000000       9.99999999999999955E-007   0.0000000000000000     
+ Eelec  =   -1.7107815456840549     
+ Emerm  =   -4.2528592975477704     
+  ---- OK---
+ ------------done-----------
+  Energy       =   -4.2528592975477704     
+ *** Forces
+              -0.09862342              -0.00000000               0.60309682
+               0.19622316              -0.00000000              -0.78502074
+              -0.29289685               0.28963217              -0.21657903
+              -0.29289685              -0.28963217              -0.21657903
+               0.48819396               0.00000000               0.61508198
+ =================================================
+  more ?  /1=yes/
+----------------------------------------------------------------
+
+
+
+j2c@jackaroo:~/Development/bohm/dftb/120424/test/Reference/Ref> tail   FRC.DAT-*
+==> FRC.DAT-GNU <==   :            <----- (WRONG:  ~/Development/dftb/src_dev2-new_omp-prof-GNU/dftb  )
+ ~/Development/dftb/src_dev2-new-debug/dftb-gnu < run.dftb-pgi
+# ATOM N0.
+# FORCE_X, FORCE_Y, FORCE_Z
+#
+#
+    1   -0.3945271732E-01    0.2015515680E-17    0.1064863961E+00
+    2   -0.2955089618E-01   -0.1080792981E-17   -0.4984978850E+00
+    3   -0.5324170508E-01    0.5283391883E-01   -0.3758400011E-01
+    4   -0.5324170508E-01   -0.5283391883E-01   -0.3758400011E-01
+    5    0.1754870237E+00   -0.1074111853E-17    0.4671794891E+00
+rms/d:   0.0000   0.0000
+
+==> FRC.DAT-GNU-OLD <==  :           <------(GOOD- GNU:   ~/Development/dftb/src_dev2-new2/dftb-gnu
+# ATOM N0.
+# FORCE_X, FORCE_Y, FORCE_Z
+#
+#
+    1   -0.9862305643E-01   -0.9246780096E-16    0.6030959201E+00
+    2    0.1962226860E+00    0.3209818841E-16   -0.7850201268E+00
+    3   -0.2928964884E+00    0.2896318010E+00   -0.2165787407E+00
+    4   -0.2928964884E+00   -0.2896318010E+00   -0.2165787407E+00
+    5    0.4881933473E+00    0.1507190096E-16    0.6150816882E+00
+rms/d:   0.0000   0.0000
+
+==> FRC.DAT-PGI <==   :   <------ (WRONG-PGI:  ~/Development/dftb/src_dev2-new/dftb-pgi     < run.dftb )
+# ATOM N0.
+# FORCE_X, FORCE_Y, FORCE_Z
+#
+#
+    1    0.1982837612E+00    0.9526340914E-16    0.2497440038E+00
+    2   -0.5671351505E-01   -0.1305779185E-16   -0.5022437848E+00
+    3   -0.1377420111E+00    0.1511556410E+00   -0.1084966324E+00
+    4   -0.1377420111E+00   -0.1511556410E+00   -0.1084966324E+00
+    5    0.1339137759E+00   -0.1557923736E-16    0.4694930459E+00
+rms/d:   0.0000   0.0000
+
+==> FRC.DAT-PGI-OLD <==  :             <------(GOOD- PGI:   ~/Development/dftb/src_dev2-new2/dftb-pgi )
+
+# ATOM N0.
+# FORCE_X, FORCE_Y, FORCE_Z
+#
+#
+    1   -0.9862305643E-01    0.8874761428E-17    0.6030959201E+00
+    2    0.1962226860E+00   -0.3324609594E-17   -0.7850201268E+00
+    3   -0.2928964884E+00    0.2896318010E+00   -0.2165787407E+00
+    4   -0.2928964884E+00   -0.2896318010E+00   -0.2165787407E+00
+    5    0.4881933473E+00   -0.4861617960E-17    0.6150816882E+00
+rms/d:   0.0000   0.0000
+j2c@jackaroo:~/Development/bohm/dftb/120424/test/Reference/Ref> 
+
+
+
+
+--- quick rollback fix: 
+
+    replace my_gradient.f with old  version  "~/Development/dftb/src_dev2-new2/my_gradient.f"
+

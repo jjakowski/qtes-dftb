@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --job-name="c37"
+#SBATCH --output="c37.%j.SG.%N.out"
+##SBATCH --partition=compute 
+#SBATCH --partition=debug 
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=24
+#SBATCH -t 0:30:00
+#Uncomment for detailed output
+#export ACC_NOTIFY=1
+#Run the job
+#------------
+export  OMP_NUM_THREADS=1
+#nthreads=96
+ulimit -a
+ulimit  -c unlimited
+ulimit  -s unlimited
+#ulimit  -m unlimited
+
+exec=~sgarashc/Work/sg-code/qtes.x
+#ibrun   -np  ${nthreads} ${exec}    tddft.nw   tddft.out   
+
+echo  "Starting at: " `date`
+ls   -l $exec 
+#ibrun   -np  ${nthreads} ${exec}     >&  junk 
+ibrun  --npernode 24 ${exec}     >&  junk 
+#ibrun   ${exec}     >&  junk 
+
+echo  "Done     at: " `date`

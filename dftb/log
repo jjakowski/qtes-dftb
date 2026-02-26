@@ -1,0 +1,44 @@
+j2c@jackaroo:~/Development/bohm/MD/120709/src/dftb> make
+....................................
+........  Make of dftb for Linux completed.
+........  Rquired datasize limit to run it: 176M
+gfortran: eglcao.o: linker input file unused because linking not done
+gfortran: skpar.o: linker input file unused because linking not done
+gfortran: gettab.o: linker input file unused because linking not done
+gfortran: xnorm.o: linker input file unused because linking not done
+gfortran: geometries.o: linker input file unused because linking not done
+gfortran: vnorm.o: linker input file unused because linking not done
+gfortran: slkode.o: linker input file unused because linking not done
+gfortran: ewevge.o: linker input file unused because linking not done
+gfortran: slktrafo.o: linker input file unused because linking not done
+gfortran: self.o: linker input file unused because linking not done
+gfortran: input.o: linker input file unused because linking not done
+gfortran: cgrad.o: linker input file unused because linking not done
+gfortran: ranmar.o: linker input file unused because linking not done
+gfortran: broyden.o: linker input file unused because linking not done
+gfortran: my_mulliken.o: linker input file unused because linking not done
+gfortran: my_gradient.o: linker input file unused because linking not done
+gfortran: short_range.o: linker input file unused because linking not done
+gfortran: long_range.o: linker input file unused because linking not done
+gfortran: shift.o: linker input file unused because linking not done
+gfortran: repulsiv.o: linker input file unused because linking not done
+gfortran: fermi.o: linker input file unused because linking not done
+gfortran: output.o: linker input file unused because linking not done
+gfortran: gamma.o: linker input file unused because linking not done
+gfortran: gammamat.o: linker input file unused because linking not done
+gfortran: atomen.o: linker input file unused because linking not done
+gfortran: dispersion_egr.o: linker input file unused because linking not done
+gfortran: dispersionread.o: linker input file unused because linking not done
+gfortran: externalchgrad.o: linker input file unused because linking not done
+gfortran: externalshift.o: linker input file unused because linking not done
+gfortran: reada.o: linker input file unused because linking not done
+gfortran: dumpm.o: linker input file unused because linking not done
+gfortran: dftb_init.o: linker input file unused because linking not done
+gfortran: dftb_init_mpi.o: linker input file unused because linking not done
+gfortran: do_dftb.o: linker input file unused because linking not done
+gfortran: derivs2.o: linker input file unused because linking not done
+ar -r  libdftb.a  eglcao.o skpar.o gettab.o xnorm.o geometries.o vnorm.o slkode.o ewevge.o slktrafo.o self.o input.o cgrad.o ranmar.o broyden.o my_mulliken.o my_gradient.o short_range.o long_range.o shift.o repulsiv.o fermi.o output.o gamma.o gammamat.o atomen.o dispersion_egr.o dispersionread.o  externalchgrad.o externalshift.o  reada.o   dumpm.o dftb_init.o  dftb_init_mpi.o do_dftb.o  derivs2.o  
+ar: creating libdftb.a
+
+
+

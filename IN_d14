@@ -1,0 +1,24 @@
+14 	\nat, number of atoms
+1 	\nq, number of quantum atoms which should be listed first
+2	\kmax,number of large time steps
+4	\kout,number of substeps
+10.d0	\dt,large stepsize
+0 0	\ipot, 0-QP=0, 1-linear p-fit, 2-QP along z;isr, 1-Gaussian sampling is on, 0-off
+2.0d0	\squeeze for gasdev/power for cutoff
+0       \0=Ehrenfest 
+48 0	\number of sampling points 0/1=init/read
+
+H 13d0  0.0d0 0.0d0 6.d0 0d0 0d0 -13.74d0 1836d0 \symbol a0,x0,y0,z0,px,py,pz m 
+C 130d0    0.0d0 0.0d0 0d0 0d0 0d0 0d0 22032d8 \symbol a0,x0,y0,z0,px,py,pz m
+C 130d0    0.0d0 0.0d0 0d0 0d0 0d0 0d0 22032d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+C 130d0    0.0d0 0.0d0 0d0 0d0 0d0 0d0 22032d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+C 130d0    0.0d0 0.0d0 0d0 0d0 0d0 0d0 22032d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m
+H 13d0  0.0d0 0.0d0  0.0d0 0d0 0d0  0.0d0 1836d8 \symbol a0,x0,y0,z0,px,py,pz m

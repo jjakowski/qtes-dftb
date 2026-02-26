@@ -1,0 +1,89 @@
+        program potext
+        implicit real*8 (a-h,o-z)
+        include 'maxima.inc'
+        real*8 C(3,nndim),Frc(3*nndim)
+        integer IAt(nndim)
+        real*8 V(mdim*mdim)
+        character infile*80, outfile*80
+        character*70 blabel 
+
+c
+c -parallel trajectories
+c
+       include 'mpiio.inc'    ! defines filehandlers:  istdio, istdout
+       infile='run.dftb'
+       outfile='out.dftb'
+
+
+
+        blabel = 'dupa:    '
+        ii =0
+
+100        write(*,*)'Nat = ?'
+        read(*,*) Nat
+        write(*,*)'junk, iat, coor = >'
+        read(*,*)
+        do i =1,Nat
+          read(*,*)ii, iiat, x,y,z
+          IAt(i) = iiat
+          C(1,i) = x  
+          C(2,i) = y  
+          C(3,i) = z  
+          enddo
+
+           iii= iii+1
+           write(blabel,101) iii
+101       format('bohm: ', I6)
+          write(*,*)'***** C :'
+          do i=1,Nat 
+             write(*,110)iat(i),C(1,i),C(2,i),C(3,i)
+             enddo
+
+          ibohm=1
+cconvert  CC from Angstroms  to bohrs 
+          bohr2A =  0.52917724
+          A2bohr =1.0/bohr2A
+          do i=1,Nat
+             C(1,i) = C(1,i)*A2bohr
+             C(2,i) = C(2,i)*A2bohr
+             C(3,i) = C(3,i)*A2bohr
+             enddo
+
+c--          
+!          call timedump()
+          open(istdin,file=infile,status='old')
+          open(istdout,file=outfile,status='unknown')
+!          call pbdylcao(ibohm,nat,iat,C,Frc,Energy,Emermin,blabel,V)
+          call derivs(nat,iat,C,Energy,frc) 
+!          call timedump()
+          close(istdin)
+          close(istdout)
+
+          write(*,*)'------------done-----------'
+          write(*,*)' Energy       = ', Energy
+
+          write(*,*)'*** Forces'
+          write(*,111) (Frc(i),i=1,3*nat)
+
+          write(*,*)'================================================='
+          write(*,*)' more ?  /1=yes/'
+          read(*,*) more
+          if (more.eq.1)  goto 100
+
+110       format(I6,100(' ',E22.16))          
+111       format(3('   ',F22.8))          
+
+          end
+c-----------------------------------------------------------
+!       subroutine   derivs(nat,iat,C,Energy,frc)        
+!       implicit real*8 (a-h,o-z)
+!       real*8  C(3,*), frc(3,*)
+!       integer iat(*)
+!       character*70 blabel 
+!       blabel=' '
+!       ibohm=1
+!        
+!        call pbdylcao(ibohm,nat,iat,C,Frc,Eelec,Emermin,blabel,V)
+!        energy =  Emermin 
+!         return
+!         end

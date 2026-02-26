@@ -1,0 +1,6 @@
+! nqx is the max number of quantum dimensions, ndx is max number of 
+!	all dimensions,npx is max number of traj
+! njm is the number of traj for making a trajectory movie
+! nchkwf step to print out the position, momentum and potential for H
+	parameter(nqx=200,ndx=700,npx=5000)
+	parameter(njm=20,nchkwf=100)

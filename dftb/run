@@ -1,0 +1,18 @@
+
+
+
+
+# 
+#j2c@jackaroo:~/Development/bohm/dftb/120424/src4-mpi> 
+#
+# j2c@jackaroo:~/Development/bohm/dftb/120424/src4-mpi> mpif90 -showme:compile
+# -I/usr/lib/mpi/gcc/openmpi/include -pthread -I/usr/lib/mpi/gcc/openmpi/lib
+# j2c@jackaroo:~/Development/bohm/dftb/120424/src4-mpi> mpif90 -showme:link
+# -pthread -I/usr/lib/mpi/gcc/openmpi/lib -L/usr/lib/mpi/gcc/openmpi/lib -lmpi_f90 -lmpi_f77 -lmpi -lopen-rte -lopen-pal -ldl -Wl,--export-dynamic -lnsl -lutil -lm -ldl
+
+
+gfortran -c  -I/usr/lib/mpi/gcc/openmpi/include -pthread -I/usr/lib/mpi/gcc/openmpi/lib    atomen.f broyden.f cgrad.f derivs2.f derivs.f dftb_init.f dispersion_egr.f dispersionread.f do_dftb.f dumpm.f eglcao.f ewevge.f externalchgrad.f externalshift.f fermi.f gammamat.f gamma.f geometries.f gettab.f input.f long_range.f my_gradient.f my_mulliken.f output.f pbdylcao.f potext2_mpi.f ranmar.f reada.f repulsiv.f self.f shift.f short_range.f skpar.f slkode.f slktrafo.f timedump.f vnorm.f xnorm.f
+
+
+
+gfortran -o a.out -pthread -I/usr/lib/mpi/gcc/openmpi/lib -L/usr/lib/mpi/gcc/openmpi/lib -lmpi_f90 -lmpi_f77 -lmpi -lopen-rte -lopen-pal -ldl -Wl,--export-dynamic -lnsl -lutil -lm -ldl   potext2_mpi.o   derivs2.o  timedump.o

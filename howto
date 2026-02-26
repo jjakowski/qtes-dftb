@@ -1,0 +1,17 @@
+#  command 'screen' to save ssh sessions
+#  to start a saver session type: screen -S [name]
+#  to list all your sessions (on the same node) type: screen -list
+#  to resume a screen session type: screen -r -d [name or number]
+#  -r is reattach -d is detach
+#
+#
+# debug queue on comet 
+srun  -A  TG-DMR110037   --pty    -t 30:00  --partition=debug  --ntasks-per-node=24 --wait=172800   /bin/bash -l
+#
+# where ibrun launches executable EXEC; out of sbatch lines  #sbatch (single #) are the lines that are read; non-sbatch lines # means a comment 
+# to submit a production run code type sbatch sbatch.script 
+#
+#
+# omp_num_trhreads is how many threads per task [1,24]; if omp=1 then  24 cores will be used on a node; 
+# if omp=24, then 1 cores will be used on a node; 
+# 24/omp == -npernode (mpi tasks per node); number of processors = npernode*(number of nodes)

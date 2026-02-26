@@ -1,0 +1,204 @@
+C Output from Public domain Ratfor, version 1.0
+      subroutine usualgrd(nn,nbeweg,ndim,izp,lmax,ind,period,doscf, x,ev
+     *,a,b,occ,shift,dacc,boxsiz,xinvbox,grad)
+C
+C
+      implicit real*8 (a-h,o-z)
+      include 'maxima.inc'
+C
+      real*8 deltax
+      parameter ( deltax = 0.01 )
+C
+C input parameter
+C
+      logical period,doscf
+      integer nn,nbeweg,ndim,izp(*),lmax(*),ind(*)
+      real*8 x(3,*),ev(*),a(mdim,mdim),b(mdim,mdim),occ(*),grad(3,*)
+      real*8 dacc,boxsiz(3,3),xinvbox(3,3),shift(*)
+      real*8 aa
+      real*8 xx(3,nndim)      ! copy of x here
+C
+C Parameter used local
+C
+      integer m,n,i,j,k,lj,lk,mj,mk
+      integer mu,nu,izpj,izpk,indj,indk
+      real*8 au(ldim,ldim),bu(ldim,ldim),ocmcc,dgrh,rcdx,xhelp,dgrs,dgr
+      real*8 auh(ldim,ldim),buh(ldim,ldim)
+
+      integer NChunks, NChunkSize  
+      integer OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
+
+      call cpu_time(t0)
+      rcdx=1.0/deltax
+
+
+      do23000 i=1,nn 
+!        do23002 k=1,3 
+          grad(1,i) = 0.0
+          grad(2,i) = 0.0
+          grad(3,i) = 0.0
+!23002     continue
+23000   continue
+
+
+C setup of density and energy weighted matrix 
+C
+      do23004 n = 1,ndim 
+        do23006 m = 1,ndim 
+          b(m,n) = 0.0
+23006     continue
+23004   continue
+
+      
+      nocc= 0 
+      do i=1,ndim
+        !if(occ(i) .lt. dacc)  nocc=  i
+        if(occ(i) .gt. dacc)  nocc=  nocc+ 1
+        enddo
+      call cpu_time(t1)
+
+c
+c jj:energy weighthed density matrix:
+c      
+!      write(istdout,*)'ndim, nocc =', ndim, nocc
+
+!$OMP  PARALLEL SHARED(A,B,NChunkSize)
+!$OMP+ PRIVATE(id,i,m,n,ocmcc)   
+
+       NChunks =  2* OMP_GET_NUM_THREADS()
+       NChunkSize= (ndim+NChunks-1)/NChunks 
+!       write(istdout,*)'NChunks,NChunkSize:',NChunks,NChunkSize
+     
+!!$OMP DO SCHEDULE(dynamic, NChunkSize)     
+!$OMP DO SCHEDULE(dynamic, 1)
+      do   m = 1,ndim 
+        do  i = 1,nocc 
+          do  n = 1,m-1 
+               ocmcc = occ(i)*a(m,i)*a(n,i)
+               b(n,m) = b(n,m) + ocmcc*ev(i)   ! C## upper triangle
+               b(m,n) = b(m,n) + ocmcc         ! C## lower triangle
+               enddo 
+            enddo
+          enddo    
+!$OMP END PARALLEL
+              
+112       format(I4, 100(' ',E12.5))
+
+      call cpu_time(t2)
+!      write(istdout,*)'jj: ' ,t1-t0,t2-t1
+
+      do23016 n = 1,ndim 
+        do23018 m = 1,ndim 
+          if(abs(b(m,n)) .lt. dacc) b(m,n) = 0.0
+23018      continue
+23016   continue
+
+
+C
+C gradient: normal contribution
+C
+C for the atom on position l" the force contribution of the hamilton matrix 
+C can be written as (The sum over the i for the different c_i can be 
+C evaluated earlier and is included in the coefficients C):
+C
+C f =  sum_{l,l'} sum_{mu,nu} C_{l,mu}  C_{l,nu} (d H_{l,l'}^{mu,nu}/ d R_{l"})
+C
+C  l,l' are the atom positions mu,nu the orbitals
+C  H_{l,l'}^{mu nu} = < phi_mu(r-R_{l}) | H | phi_nu(r-R_{l'}) >
+C
+C the term (d H_{l,l'}^{mu,nu}/ d R_{l"}) is not zero only if (l or l' are
+C equal l") and (l not equal l')
+C
+C we have also (d H_{l,l"}^{mu,nu}/ d R_{l"}) = (d H_{l",l}^{nu,mu}/ d R_{l"})
+C
+C since H_{l,l"}^{mu,nu} = H_{l",l}^{nu,mu}
+C 
+C so that we can write
+C
+C f =sum_(l neq l") sum_{mu,nu} C_{l,mu}C_{l,nu} 2*(d H_{l,l"}^{mu nu}/d R_{l"})
+C
+C If you want to sum over either index l and l', you have once to replace
+C dif by -dif in the call of slkode! 
+C
+      call cpu_time (t3)
+
+
+!$OMP  PARALLEL private(i,j,k,xhelp,au,bu,auh,buh,lj,mj,n,nu,lk,mk,
+!$OMP+                  m,mu,dgrh,dgrs,dgr,xx,id)  
+
+        do i=1,nn
+          xx(1,i) = x(1,i)
+          xx(2,i) = x(2,i)
+          xx(3,i) = x(3,i)
+         enddo  
+!!!$OMP DO SCHEDULE(static) 
+!$OMP DO SCHEDULE(dynamic,10)
+ 
+      do 23022 j = 1,nbeweg                   ! ## for every movable atom
+        do 23024 k = 1,nn                     ! ## for every atom that acts on the moveable atom
+          if(k.ne.j)then
+            do 23028 i = 1,3 
+C## for every spatial component
+C hamilton and overlap matrix contribution
+C
+              xhelp = xx(i,j)
+              xx(i,j) = xhelp + deltax
+              call slkmatrices(k,j,xx,au,bu)
+              xx(i,j) = xhelp - deltax
+              call slkmatrices(k,j,xx,auh,buh)
+              xx(i,j) = xhelp
+C
+C   use sumation over angular momentum and magnetic quantum numbers
+C   since shift is actually defined for the orbitals 
+C
+              do 23030 lj = 1,lmax(izp(j)) 
+                do 23032 mj=1,2*lj-1 
+                  n = (lj-1)**2 + mj
+                  nu = n + ind(j)
+                  do 23034 lk = 1,lmax(izp(k)) 
+                    do 23036 mk = 1,2*lk-1 
+                      m = (lk-1)**2 + mk
+                      mu = m + ind(k)
+C
+C dgrh = 2 * ( d H_{k,j}^{m,n}/ d R_{j} )
+C
+                      dgrh = (au(m,n)-auh(m,n))*rcdx
+C
+C dgrs = - 2 * ( d S_{k,j}^{m,n}/ d R_{j} )
+C
+                      dgrs = -(bu(m,n)-buh(m,n))*rcdx
+C
+C dgr  =  ( d S_{k,j}^{m,n}/ d R_{j} ) * (shift(k)+shift(j))
+C            
+                      if(doscf) dgr = -0.5 * dgrs * (shift(k)+shift(j))
+C
+C only lower triangle contains sum_i n(i) c_{mu,i} c_{nu,i}
+C only upper triangle contains sum_i epsilon(i) n(i) c_{mu,i} c_{nu,i}
+C
+                      if(mu.gt.nu)then
+                        dgrh = dgrh * b(mu,nu)
+                        dgrs = dgrs * b(nu,mu)
+                        if(doscf) dgr = dgr * b(mu,nu)
+                      else
+                        dgrh = dgrh * b(nu,mu)
+                        dgrs = dgrs * b(mu,nu)
+                        if(doscf) dgr = dgr * b(nu,mu)
+                        endif
+                      grad(i,j) = grad(i,j) + dgrh + dgrs
+                      if(doscf) grad(i,j) = grad(i,j) + dgr
+23036                 continue
+23034               continue
+23032             continue
+23030           continue
+23028         continue
+            endif
+23024     continue
+23022   continue
+!$OMP END PARALLEL
+
+      call cpu_time (t4)
+!      write(istdout,111) t1-t0,t2-t1,t3-t2,t4-t3
+111   format('usugrd: ', 100(' ', F14.8))
+      !call flush(6)
+
+      end
