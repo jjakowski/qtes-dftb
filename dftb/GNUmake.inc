@@ -42,9 +42,12 @@ ifeq ($(PLATFORM),Linux)
 #	LAPACK =  -llapack -pgf90libs
 #--- gpu:
 	FC =  mpif90  
-	FOPT =  -O2  -fopenmp
-	LAPACK = -mkl=sequential
-        BLAS = -mkl=sequential
+	FOPT =  -O2  -fopenmp -fallow-argument-mismatch -std=legacy
+#	LAPACK = -mkl=sequential
+#       BLAS = -mkl=sequential
+#--- gfortran + OpenBLAS (provides both BLAS and LAPACK):
+	LAPACK = -lopenblas
+	BLAS =
 #	LAPACK =  -llapack 
 #	BLAS = -lblas  -g
 
