@@ -87,7 +87,7 @@ To use one of them, edit `IN_dftb`.
   about 25 s on 12 ranks: the C-H bond vibrates, and the total energy
   is conserved to about 1e-5 relative. The input was repaired on
   2026-11-05 (`docs/KNOWN_ISSUES.md` F2). The `ipot=1` code path has a
-  suspected bug, issue #5.
+  likely bug, issue #5. It has no reference until that is fixed.
 
 ## Running
 

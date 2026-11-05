@@ -49,7 +49,7 @@ issue is fixed, move it to **Fixed** and note the commit.
   `v`/`dv` into `vlocal`/`dvlocal` before the loop.
 - **Found:** 2026-11-05
 
-### 5. `trot`: with `ipot = 1`, the quantum-atom force is applied twice (suspected)
+### 5. `trot`: with `ipot = 1`, the quantum-atom force is applied twice (likely bug)
 
 - **Where:** `qtes.f`, `subroutine trot`, both momentum half-steps
   (the lines `if(ipot.eq.1) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2`)
@@ -62,7 +62,8 @@ issue is fixed, move it to **Fixed** and note the commit.
 - **Impact:** this affects only `ipot = 1` runs. Of the examples, only
   `h-flake-111` uses `ipot = 1`. Its results, including its reference
   data if one is added, may therefore contain this error.
-- **Status:** suspected. Confirm with the code author before fixing.
+- **Status:** likely bug. The code author agrees (2026-11-05). The fix is
+  deferred, and it blocks the `h-flake-111` reference.
 - **Found:** 2026-11-05
 
 ## Notes on behaviour (not bugs, but easy to miss)

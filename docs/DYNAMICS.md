@@ -107,7 +107,7 @@ three places: `init_traj` (initial forces), `trot` (every substep), and
 - With `isr = 0`, all trajectories are identical, so the fitted quantum
   force carries no information. The quantum potential only makes sense
   with sampling on.
-- Suspected bug: with `ipot = 1`, the force on the quantum atom is
+- Likely bug: with `ipot = 1`, the force on the quantum atom is
   applied twice in each half-step (`KNOWN_ISSUES.md` #5).
 
 ## `isr`, `pow`: initial sampling
