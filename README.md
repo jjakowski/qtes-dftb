@@ -22,7 +22,7 @@ Makefile            builds qtes.x
 dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GNUmake.inc
 examples/           input sets and reference results, see examples/README.md
 tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
-docs/               KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
+docs/               DYNAMICS.md, KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
 ```
 
 ## Requirements
@@ -117,6 +117,16 @@ The main outputs are `ener` (energies), `cor` (correlation function), `aver`
 `wf0` and `wft` (initial and final QT positions), and `qtx`...`clz` (20 QTs
 of the quantum atom and the first classical atom). `docs/sg-notes-files`
 gives the column-by-column formats.
+
+## Dynamics modes
+
+[`docs/DYNAMICS.md`](docs/DYNAMICS.md) describes the run-mode switches and
+what the code does for each one:
+- `ipf`: Ehrenfest mode vs independent classical copies
+- `ipot`: the quantum potential
+- `isr` / `pow`: initial sampling
+- `qmn` / `qmx`: the z-window that excludes trajectories
+- the restart flag
 
 ## Known issues
 
