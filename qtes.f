@@ -866,15 +866,21 @@ c--------------- print  ------------------------------------
 214     continue
         do 213 j=1,n1
 213      b(j,j)=-m2(n1,n1)/2d0
+!----------- the linear fit needs at least as many QTs with w>0 as ---
+!----------- basis functions (n1 for ipot=1, n3 for ipot=2) ----------
+        nw=0
+        do k=1,np
+         if(w(k).gt.0d0) nw=nw+1
+        enddo
+        nfit=n1
+        if(ipot.ne.1) nfit=n3
+        if(nw.lt.nfit) call qpfail(t,nw,nfit,0,myid)
 
 c----------------3D quantum potential----------------
         if(ipot.eq.1) then
 
         call dposv('L',n1,nqd,m2,nd2,b,nd2,info)
-        if(info.ne.0) then
-         write(*,*) 'DPOSV FAILED'
-         stop
-        endif
+        if(info.ne.0) call qpfail(t,nw,nfit,info,myid)
         if (myid.eq.0)  then
          if(ist.eq.0) then
           write(14,1000) t,((b(j,i),j=1,n1),i=1,nqd)
@@ -950,10 +956,7 @@ c------------quantum potential along z--------------
         
 !-------------------------------------
         call dposv('L',n3,nqz,m3,nd2,b3,nd2,info)
-        if(info.ne.0) then
-         write(*,*) 'DPOSV FAILED'
-         stop
-        endif
+        if(info.ne.0) call qpfail(t,nw,nfit,info,myid)
         if (myid.eq.0)  then
          if(ist.eq.0) then
           write(14,1000) t,((b3(j,i),j=1,n3),i=1,nqz)
@@ -984,6 +987,26 @@ c------------quantum potential along z--------------
         end
 c-------------------------------------------------------------
 c-------------------------------------------------------------
+        subroutine qpfail(t,nw,nfit,info,myid)
+!------- quantum-force fit cannot be done: report, stop ALL ranks --
+!------- (a rank-local stop leaves the other ranks hanging) --------
+        implicit real*8 (a-h,o-z)
+        include 'mpif.h'
+        if(info.eq.0) then
+         write(*,*) 'QPOT ERROR (rank',myid,'): t=',t
+         write(*,*) '  only',nw,' QTs with w>0; fit needs',nfit
+        else
+         write(*,*) 'QPOT ERROR (rank',myid,'): t=',t
+         write(*,*) '  DPOSV FAILED, info=',info,' QTs w>0:',nw
+         write(*,*) '  moment matrix singular: QT positions'
+         write(*,*) '  identical or coplanar (isr=0?)'
+        endif
+        write(*,*) '  ipot>0 needs enough sampled QTs inside the'
+        write(*,*) '  qmn/qmx window: isr=1, more QTs, wider window'
+        call flush(6)
+        call mpi_abort(MPI_COMM_WORLD,1,ierr)
+        end
+!-------------------------------------------------------------
         subroutine dotvec(n,nd,f,b,p)
 c---------- computes dot product of two vectors 
         implicit real*8 (a-h,o-z)

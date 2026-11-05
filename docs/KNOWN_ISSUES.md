@@ -22,26 +22,24 @@ issue is fixed, move it to **Fixed** and note the commit.
   deferred, and it blocks the `h-flake-111` reference.
 - **Found:** 2026-11-05
 
-### 6. `ipot = 1` fit fails when too few trajectories remain
+### 7. Weights can differ between MPI ranks for one substep (suspected)
 
-- **Where:** `qtes.f`, `subroutine qpot`. The linear quantum-force fit
-  solves a least-squares system with `NBAS = nqd + 1` basis functions
-  (4 for one quantum atom).
-- **Problem:** the fit needs at least `NBAS` trajectories with nonzero
-  weight, and in practice more, spread out in space. If too many
-  trajectories are excluded below `qmn`, or if all trajectories coincide
-  (`isr = 0`), the system is singular. The code then prints
-  `DPOSV FAILED` and continues with a garbage quantum force, and the
-  energy blows up.
-- **Seen in:** a stress test (2026-11-05) of `h-flake-111` with `qmn`
-  raised to 3.1 bohr. The surviving trajectories dropped 12 -> 8 -> 7 ->
-  5 -> 3. At 3 remaining, the fit failed (t ~ 46), and the kinetic energy
-  jumped to ~1e20 Ha. The pre-fix and post-fix binaries for issue F3
-  behave the same way here.
-- **Impact:** none of the examples are affected (`h-flake-111` uses the
-  default `qmn = -15`).
-- **Likely fix:** stop with a clear message when `DPOSV` fails, or when
-  fewer than `NBAS` weighted trajectories remain, instead of continuing.
+- **Where:** `qtes.f`, `subroutine trot`. The force loop sets `w(ip)=0`
+  only on the rank that owns QT `ip`. The Ehrenfest average that comes
+  right after the force loop then uses each rank's own copy of `w`.
+- **Problem:** in the substep where a QT first crosses `qmn`, the owning
+  rank drops it from the average of the classical forces, while the
+  other ranks still include it. The ranks then propagate slightly
+  different classical forces, so their copies of the trajectories can
+  drift apart. The next half-step zeroes `w` consistently on all ranks,
+  but by then the copies have already drifted.
+- **Evidence:** in the `qmn = 3.1` stress test of `h-flake-111` (see F6),
+  11 ranks failed the fit while rank 0 continued for another step.
+- **Impact:** this happens only when a QT crosses `qmn`. None of the
+  examples do.
+- **Likely fix:** zero `w(i)` for all QTs on all ranks right after the
+  position update, before `qpot` and the force loop. Alternatively,
+  synchronize `w` across ranks after the force loop.
 - **Found:** 2026-11-05
 
 ## Notes on behaviour (not bugs, but easy to miss)
@@ -179,3 +177,46 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
     until z < 8.5, and then followed DFTB forces.
 - **Verification:** all four examples are byte-identical before and
   after the fix, since none of them leaves the window.
+
+### F6. Quantum-force fit failure ended the run with a rank-local `stop`
+
+- **Where:** `qtes.f`, `subroutine qpot` (`ipot = 1` and `ipot = 2`)
+- **What the fit is:**
+  - The linear quantum-force (LQF) method fits the non-classical
+    momentum with the basis `f = (x, y, z, 1)`, i.e. `NBAS = nqd + 1`
+    functions (for `ipot = 2`, only z and 1).
+  - It builds the weighted moment matrix `M = sum_k w_k f(q_k) f(q_k)^T`
+    over all QTs and solves it with LAPACK `dposv`.
+  - `M` can be inverted only if the QTs with `w > 0` span all fitted
+    directions: at least `NBAS` of them, not lying on a common plane,
+    line, or point.
+- **Problem:**
+  - When `M` was singular, `qpot` printed `DPOSV FAILED` and called
+    `stop` on that rank only. The other ranks hung until `mpirun`
+    killed the job with a generic error.
+  - `M` is singular when fewer than `NBAS` QTs remain inside the
+    `qmn`/`qmx` window, or when all QTs coincide (`ipot != 0` with
+    `isr = 0`).
+- **Fix** (2026-11-05), in the commit "Abort cleanly when the
+  quantum-force fit cannot be done (issue #6)":
+  - `qpot` now counts the QTs with `w > 0` before the solve and stops if
+    there are fewer than `NBAS`.
+  - If `dposv` fails, `qpot` stops as well.
+  - In both cases the new subroutine `qpfail` prints a clear
+    `QPOT ERROR` (time, count, `info`, likely cause, hints) and calls
+    `mpi_abort`, so all ranks stop together.
+- **Remaining limitation (not a bug):** before `M` becomes exactly
+  singular, a fit from few QTs, or from QTs that nearly lie on a common
+  plane or line, is ill-conditioned. The quantum force can then become
+  very large.
+  - In the `qmn = 3.1` stress test, the quantum kinetic energy reached
+    about 11.6 Ha with 5 QTs left, before the count check stopped the
+    run at 3 QTs (t = 46.5).
+  - Use enough QTs, with `isr = 1`, and a `qmn`/`qmx` window that keeps
+    most of them inside.
+- **Verification:**
+  - All four examples are byte-identical before and after the fix.
+  - In the stress test, all 12 ranks report `only 3 QTs with w>0; fit
+    needs 4` at t = 46.5, followed by one clean `MPI_ABORT`.
+  - The run with `ipot = 1` and `isr = 0` reports `DPOSV FAILED, info=3
+    ... moment matrix singular ... (isr=0?)` at t = 0.

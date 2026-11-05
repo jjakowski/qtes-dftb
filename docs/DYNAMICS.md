@@ -104,9 +104,13 @@ three places: `init_traj` (initial forces), `trot` (every substep), and
 - **`ipot = 2`:** the same linear fit, but only along z. In `trot`, the
   x and y components of the quantum atom get only the DFTB force, and z
   gets the DFTB force plus the quantum force.
-- With `isr = 0`, all trajectories are identical, so the fitted quantum
-  force carries no information. The quantum potential only makes sense
-  with sampling on.
+- The fit needs at least `nqd + 1` QTs with `w > 0` (2 for `ipot = 2`),
+  spread in all fitted directions. Otherwise `qpot` stops all ranks
+  with a `QPOT ERROR` message. This happens with `isr = 0`, where all
+  QTs coincide, or when too many QTs have left the `qmn`/`qmx` window.
+  With only a few QTs the fit is ill-conditioned, and the quantum force
+  can become very large even before that stop. Use enough sampled QTs
+  (`KNOWN_ISSUES.md` F6).
 - Likely bug: with `ipot = 1`, the force on the quantum atom is
   applied twice in each half-step (`KNOWN_ISSUES.md` #5).
 
@@ -144,8 +148,11 @@ Notes:
   when a trajectory re-enters the window and DFTB resumes. Choose `qmx`
   where the potential is flat (see `KNOWN_ISSUES.md` F5).
 - Known issues in this path:
-  - #6: with `ipot = 1`, the quantum-force fit fails if too few
-    trajectories remain inside the window.
+  - F6 (fixed): with `ipot = 1`, too few QTs left inside the window
+    made the fit fail with a rank-local `stop`. The run now stops
+    cleanly on all ranks with a `QPOT ERROR`.
+  - #7: in the substep where a QT crosses `qmn`, ranks can briefly use
+    different weights.
   - F3 (fixed): the force loop zeroed an undefined weight `w(n)`.
     It now zeroes `w(ip)`.
   - F5 (fixed): forces outside the window were undefined. They are now
