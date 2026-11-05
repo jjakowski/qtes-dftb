@@ -95,6 +95,7 @@ example.
 | `h-c4h9-14-restart` | restart test, t = 80 to 100 from a checkpoint; matches the fresh run |
 | `h-c4h9-14` | quick smoke test (about 1 s) |
 | `h-flake-53` | 53-atom system, full reference output (run on 48 ranks) |
+| `h-flake-53-print` | same system, demonstrates the `nqtprt`/`nclprt` print options (prints all QTs and all classical atoms) |
 | `h-flake-111` | chemisorbed H on a 110-atom flake, quantum potential + sampling (`ipot=1`, `isr=1`), full reference output (run on 12 ranks) |
 
 `examples/README.md` gives the details for each example. A quick check after a
@@ -133,7 +134,9 @@ QTs and the restart flag:
 ```
 
 A value of 0 or less means "all". The values in use are printed in
-`stdout.log` as `PRINT OPTIONS`.
+`stdout.log` as `PRINT OPTIONS`. For a full usage guide, see "Print
+options" in `examples/README.md`, which includes the column mapping, the
+restart note, and the `h-flake-53-print` example to try.
 
 ## Dynamics modes
 

@@ -19,11 +19,9 @@ examples/
     reference/        results from earlier runs (only where available)
 ```
 
-Line 9 of `INdyn` can also hold two optional print counts after the
-number of QTs and the restart flag: `nqtprt` (QTs in `qtx..qtz`) and
-`nclprt` (classical atoms in `clx..clz`). Both default to 20, and a value
-of 0 or less means "all". None of the examples set them, so the examples
-also test the defaults. See the top-level `README.md`.
+Line 9 of `INdyn` can also hold two optional print counts, `nqtprt` and
+`nclprt`. See "Print options" below. Only `h-flake-53-print` sets them;
+the other examples use the defaults.
 
 The code expects the input files to have exactly these names. `IN_dftb`
 selects `cc.spl`, `ch-g2ms.spl`, `hc-g2ms.spl` and `hh.spl`. The `*-b3.spl`
@@ -40,6 +38,7 @@ To use one of them, edit `IN_dftb`.
 | `h-c4h9-14-restart` | same system, restart from t = 80 | 5 x 10, dt 20 (runs t = 80 to 100) | 48 | full output set |
 | `h-c4h9-14`     | same system | 2 x 4, dt 10 (short smoke test) | 48 | none |
 | `h-flake-53`    | H + 52-atom C/H flake | 10 x 3, dt 10 (t = 0 to 100) | 48 | full output set + old screen log |
+| `h-flake-53-print` | same as `h-flake-53`, with print options `nqtprt=48`, `nclprt=0` (all) | 10 x 3, dt 10 (t = 0 to 100) | 48 | full output set |
 | `h-flake-111`   | chemisorbed H on a 110-atom C/H flake, `ipot=1`, `isr=1` | 25 x 2, dt 3 (t = 0 to 75) | 12 | full output set |
 
 - **h-c4h9-14-ref**: this is the main regression test. `reference/` holds
@@ -79,6 +78,14 @@ To use one of them, edit `IN_dftb`.
   sampling, the norm and the kinetic energy are identical, and the DFTB
   potential energy agrees to 2e-12 relative. Over the run, the total
   energy in `ener` stays between 0.050685 and 0.050706.
+- **h-flake-53-print**: demonstrates the print options. The inputs are
+  identical to `h-flake-53`, except for line 9 of `INdyn`: `48 0 48 0`,
+  which prints all 48 QTs in `qtx..qtz` and all 52 classical atoms in
+  `clx..clz`. As a result, `qtx..qtz` have 49 columns instead of 21, and
+  `clx..clz` have 53 instead of 21. All other output files are
+  byte-identical to the `h-flake-53` reference, and so are the first 21
+  columns of `qtx..clz`: the options change only what is printed. Run it
+  on 48 ranks (about 4 s).
 - **h-flake-111**: the largest system. Unlike the other examples, the H
   is not incoming. It starts chemisorbed on C2 (C-H about 1.12 A) at
   rest. This is the only example that uses the quantum potential
@@ -89,6 +96,55 @@ To use one of them, edit `IN_dftb`.
   2026-11-05 (`docs/KNOWN_ISSUES.md` F2). `reference/` was created after
   the `ipot=1` double-force fix (F8), so use 12 MPI ranks to compare
   with it.
+
+## Print options (`nqtprt`, `nclprt`)
+
+Two optional values on line 9 of `INdyn`, after the number of QTs and the
+restart flag, set how many columns the trajectory snapshot files get:
+
+```
+ np  restart  [nqtprt  [nclprt]]   \ comment
+ 48  0                             \ defaults: nqtprt = 20, nclprt = 20
+ 48  0        48       0           \ all 48 QTs, all classical atoms
+```
+
+| Value | Controls | Default | `<= 0` |
+|---|---|---|---|
+| `nqtprt` | QTs in `qtx/qty/qtz` (and in `clx/cly/clz` when `ipf != 0`) | 20 | all QTs |
+| `nclprt` | classical atoms in `clx/cly/clz` (Ehrenfest mode, `ipf = 0`) | 20 | all classical atoms |
+
+- **Order:** to set `nclprt`, you must also give `nqtprt`. Values larger
+  than the real number are capped automatically.
+- **Check:** `stdout.log` prints the values in use, for example
+  `PRINT OPTIONS nqtprt, nclprt (<=0: all): 48 0`.
+- **`qtx/qty/qtz` columns:** time, then x/y/z of the quantum atom in QT 1,
+  QT 2, ...
+- **`clx/cly/clz` columns** (`ipf = 0`): time, then x/y/z of classical
+  atoms 1, 2, ..., all taken from the first QT with nonzero weight.
+  Classical atom *m* is atom number *nq + m* in the `INdyn`/`INxyz` atom
+  list. With one quantum atom, column 2 is atom 2, column 3 is atom 3,
+  and so on.
+- **`clx/cly/clz` with `ipf != 0`:** time, then the first classical atom
+  in QT 1, QT 2, ... (`nqtprt` columns).
+- **Restart:** a restart appends rows to `qtx..clz`. Use the same
+  values in the original run and in the restart, or the rows will differ
+  in length.
+- **Not affected:** `wf0`/`wft` and `aver` keep their own limit of 40
+  coordinates. `qt.dat` and `traj.sav` always contain everything.
+
+Try it with the example:
+
+```bash
+tests/run_example.sh h-flake-53-print 48
+R=$(ls -d tests/runs/h-flake-53-print_* | tail -1)
+grep "PRINT OPTIONS" $R/stdout.log
+awk '{print NF}' $R/qtx | sort -u      # 49 = time + 48 QTs
+awk '{print NF}' $R/clx | sort -u      # 53 = time + 52 classical atoms
+```
+
+To use other values, copy an example to a work directory and edit line 9
+of its `INdyn`. Do not edit the files in `examples/`: the references were
+made with these inputs.
 
 ## Running
 
