@@ -1,0 +1,43 @@
+ ############################################
+
+  Parallel version of bohmd. Ver(17/08/2016)
+
+ ############################################
+ LAGRANGIAN DYNAMICS in REAL TIME
+ EHRENFEST: AVERAGE OVER QDOF           0
+ NO R-MOMENTUM FIT: QPOT=0
+ TOTAL NUMBER OF ATOMS           14
+ DIMENSIONALITY           42  QUANTUM DIM=           3
+           1  QUANTUM ATOMS: H 
+ ATOM TYPE:            2
+          13  CLASSICAL ATOMS: C C H H H C H H H C H H H 
+ ATOM TYPE:            1           1           2           2           2           1           2           2           2           1           2           2           2
+ TIME STEPS, SUBSTEPS, dt:            5          10   2.0000000000000000     
+ LEAVE MPI INPUT
+ dftb_init_mpi, myid=            3
+ dftb_init_mpi, myid=            2
+ dftb_init_mpi, myid=            1
+ dftb_init_mpi, myid=            0
+           0 :  done with dftb_init
+ READ QTs from file           1           1          48           4
+ READ QTs:Ntr, kmax, procs          48           1           0
+ READING TRAJ INFO via set_traj
+ NORM=   1.0000000000000004     
+ KIN energy =    5.1462067327898986E-002
+ POT energy =   0.11339009048340629     
+ QP energy =    0.0000000000000000     
+ TOTAL energy =   0.11339009048340629     
+ NUMBER OF TIMESTEPS ON RESTART           1
+ t=   80.000000000000000                1
+ PRINTED IN ener: time,tot_en,q_pot,                         cl_pot,kin_qm,kin_cl
+ PRINTING POSITIONS UP TO           40  DIMENSIONS
+ SG: CLOSING FILES
+ SG: CLOSED FILES
+Note: The following floating-point exceptions are signalling: IEEE_DENORMAL
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_DENORMAL
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DENORMAL

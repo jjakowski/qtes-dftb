@@ -6,6 +6,8 @@
 #
 # The run directory gets the example's INdyn/INxyz/IN_dftb plus the shared
 # Slater-Koster files from examples/sk/. Reference data is never touched.
+# For restart examples, everything in <example>/restart/ (traj.sav and the
+# output files the run appends to) is copied in as well.
 
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
@@ -26,6 +28,7 @@ run=$here/runs/${name}_$(date +%Y%m%d-%H%M%S)
 mkdir -p "$run"
 cp "$root/examples/$name"/{INdyn,INxyz,IN_dftb} "$run"/
 cp "$root/examples/sk"/*.spl "$run"/
+[ -d "$root/examples/$name/restart" ] && cp "$root/examples/$name/restart"/* "$run"/
 cp "$exe" "$run"/
 
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}

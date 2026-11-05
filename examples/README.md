@@ -15,6 +15,7 @@ examples/
     INdyn             dynamics parameters + initial wavefunction (one line per atom)
     INxyz             model-potential parameters + starting geometry (Angstrom)
     IN_dftb           DFTB setup: ntype, lmax, which SK files to use
+    restart/          restart examples only: checkpoint traj.sav + output files to append to
     reference/        results from earlier runs (only where available)
 ```
 
@@ -30,6 +31,7 @@ To use one of them, edit `IN_dftb`.
 | Example | System | Steps (kmax x kout, dt) | QTs | Reference |
 |---|---|---|---|---|
 | `h-c4h9-14-ref` | H + C4H9 cluster, 14 atoms | 5 x 10, dt 20 (t = 0 to 100) | 48 | full output set |
+| `h-c4h9-14-restart` | same system, restart from t = 80 | 5 x 10, dt 20 (runs t = 80 to 100) | 48 | full output set |
 | `h-c4h9-14`     | same system | 2 x 4, dt 10 (short smoke test) | 48 | none |
 | `h-flake-53`    | H + 52-atom C/H flake | 10 x 3, dt 10 | 48 | screen output only |
 | `h-flake-111`   | H + 110-atom C/H flake, `ipot=1` (linear p-fit QP) | 25 x 2, dt 3 | 12 | none |
@@ -45,6 +47,21 @@ To use one of them, edit `IN_dftb`.
   stages, a run from t = 0 to 80 and a restart from 80 to 100, so their
   `wf0` and `wft` differ in form. The timing files `trajt` and `dftbt`
   differ from run to run.
+- **h-c4h9-14-restart**: tests the restart path (`set_traj`, reading
+  `traj.sav`). The inputs are the same as `h-c4h9-14-ref`, except that the
+  restart flag in `INdyn` is set to 1 (`48 1`). `restart/` holds a
+  checkpoint from a fresh run of t = 0 to 80: `traj.sav` at t = 80 and the
+  stage-1 output files. A restart needs those output files, because the
+  code opens them with `status='old'` and appends to them. The code reads
+  t = 80 from `traj.sav` and runs the remaining `kmax - t/dt` = 1 large
+  step, which is 10 substeps. After the run, `ener`, `aver`, `traj`, `cor`,
+  `qt.dat`, `traj.sav` and `qtx`...`clz` cover t = 0 to 100. The rows that
+  the restart job itself writes (t > 80) were checked against the single
+  fresh 0 to 100 run in `h-c4h9-14-ref/reference/`. `ener` and `cor` are
+  bit-identical, and the final state in `traj.sav` agrees to 1e-13 or
+  better. Two files differ by design. `wf0` is the t = 80 restart state,
+  because `set_traj` rewrites it. `wft` has a t = 80 block followed by a
+  t = 100 block, because it is appended.
 - **h-c4h9-14**: uses the same geometry as above with a much shorter run
   (about 1 s on 4 ranks). Use it for a quick build check.
 - **h-flake-53**: `reference/stdout.log` is the saved screen output of an
