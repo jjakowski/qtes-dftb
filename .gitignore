@@ -4,3 +4,4 @@
 *.o
 *.a
 qtes.x
+tests/runs/
