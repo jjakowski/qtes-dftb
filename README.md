@@ -152,8 +152,12 @@ Open bugs and behaviour that is easy to miss are listed in
 
 ## Known messages
 
-- `IEEE_DIVIDE_BY_ZERO` is printed at exit. gfortran reports any
-  floating-point exceptions that were raised during the run. The results are
-  not affected. To find the source, build with `-ffpe-trap=zero -g`.
+- gfortran reports at exit any floating-point exceptions that were raised
+  during the run.
+  - The former `IEEE_DIVIDE_BY_ZERO` / `IEEE_INVALID_FLAG` messages are
+    fixed (`docs/KNOWN_ISSUES.md` F4).
+  - `IEEE_DENORMAL`, seen in the restart example, is harmless.
+  - To locate a new exception, build with
+    `-g -fbacktrace -ffpe-trap=zero,invalid`.
 - `MPI_FINALIZE ERR 0` is the return code of `MPI_Finalize`, printed once
   per rank. The value 0 means success.

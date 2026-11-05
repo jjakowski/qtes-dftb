@@ -285,8 +285,8 @@ c         close(95+myid)
         do 91 i=1,nd
          q(i)=q0(i)
          pq(i)=0d0
-         dx(i)=1.d0/dsqrt(4.d0*a0(i,i))
          if(i.le.nqd) then
+          dx(i)=1.d0/dsqrt(4.d0*a0(i,i))
           vol=vol*dx(i)*2d0
           an=an*dsqrt(2d0*a0(i,i)/pi)
          endif

@@ -5,15 +5,6 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 3. Floating-point divide-by-zero at runtime
-
-- **Symptom:** every run prints `IEEE_DIVIDE_BY_ZERO` at exit, in all
-  examples.
-- **Impact:** none observed. The results are finite and match the
-  references.
-- **To investigate:** build with `-ffpe-trap=zero -g` to find the line
-  where it happens.
-
 ### 4. `trot`: undefined forces for trajectories above `qmx`
 
 - **Where:** `qtes.f`, `subroutine trot`, force loop:
@@ -72,6 +63,12 @@ issue is fixed, move it to **Fixed** and note the commit.
 - **Found:** 2026-11-05
 
 ## Notes on behaviour (not bugs, but easy to miss)
+
+- **`IEEE_DENORMAL` in restart runs is harmless.** gfortran reports at
+  exit that some intermediate values were below about 2e-308
+  (denormal). This comes from coordinates that are essentially zero
+  (y about 1e-20 to 1e-26) being multiplied, and it does not affect the
+  results.
 
 See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
 `ipot`, `isr`, `qmn`/`qmx`, restart).
@@ -143,3 +140,29 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
 - **Remaining:** the momenta of excluded trajectories are still updated
   in the second half-step. This is harmless, because their weight is
   0.
+
+### F4. Floating-point divide-by-zero (and invalid) at runtime
+
+- **Symptom:** every run printed `IEEE_DIVIDE_BY_ZERO` at exit, and
+  `h-flake-111` also printed `IEEE_INVALID_FLAG`.
+- **Where:** `qtes.f`, `subroutine init_traj`, loop `do 91 i=1,nd`. The
+  line `dx(i)=1.d0/dsqrt(4.d0*a0(i,i))` ran for all dimensions.
+- **Problem:**
+  - The wavepacket widths `a0` are set only for the quantum coordinates.
+    For classical coordinates `a0(i,i)=0`, so `dx(i)` became
+    `1/sqrt(0) = Inf`.
+  - `a0` is dimensioned `a0(nqx,nqx)` with `nqx=200`. For systems with
+    `nd > 200` (`h-flake-111`, `nd=333`), the loop read `a0(i,i)` out of
+    bounds, and sqrt of a negative garbage value gave NaN.
+  - `dx` is used only for `i <= nqd`, so the bad values never reached
+    the results.
+- **Found with:** a debug build (`-O0 -g -fbacktrace
+  -ffpe-trap=zero,invalid`). After the fix, all four examples run with
+  both traps active.
+- **Fix:** compute `dx(i)` only inside the existing `if(i.le.nqd)`
+  block (2026-11-05), in the commit "Fix divide-by-zero / out-of-bounds
+  read in init_traj (issue #3)".
+- **Verification:** all four examples are byte-identical before and
+  after the fix, and the divide-by-zero and invalid messages are gone.
+  The restart example still reports `IEEE_DENORMAL`, which is harmless
+  (see the notes above).
