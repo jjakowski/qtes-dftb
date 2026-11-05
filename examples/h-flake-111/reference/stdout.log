@@ -1,0 +1,89 @@
+ ############################################
+
+  Parallel version of bohmd. Ver(17/08/2016)
+
+ ############################################
+ LAGRANGIAN DYNAMICS in REAL TIME
+ EHRENFEST: AVERAGE OVER QDOF           0
+ LINEAR R-MOMENTUM FIT: LINEAR Q-FORCE
+ TOTAL NUMBER OF ATOMS          111
+ DIMENSIONALITY          333  QUANTUM DIM=           3
+           1  QUANTUM ATOMS: H 
+ ATOM TYPE:            2
+         110  CLASSICAL ATOMS: C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C H H H H H H H H H H H H H H H H H H H H H H H 
+ ATOM TYPE:            1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2
+ TIME STEPS, SUBSTEPS, dt:           25           2   1.5000000000000000     
+ PRINT OPTIONS nqtprt, nclprt (<=0: all):           20          20
+ LEAVE MPI INPUT
+ dftb_init_mpi, myid=            3
+ dftb_init_mpi, myid=            2
+ dftb_init_mpi, myid=            1
+ dftb_init_mpi, myid=            5
+ dftb_init_mpi, myid=            6
+ dftb_init_mpi, myid=            7
+ dftb_init_mpi, myid=            4
+ dftb_init_mpi, myid=            0
+ dftb_init_mpi, myid=            9
+ dftb_init_mpi, myid=           10
+ dftb_init_mpi, myid=            8
+ dftb_init_mpi, myid=           11
+           0 :  done with dftb_init
+ INITIALIZE QTs           0          25          12          12
+ INITITAL WAVEFUNCTION: sampling cutoff =    4.0000000000000000     
+ width:
+   13.000000000000000        13.000000000000000        13.000000000000000     
+ position: 
+   2.4263955553875810E-003   1.2449317812464569        3.1590592992932462     
+ momentum: 
+   0.0000000000000000        0.0000000000000000        0.0000000000000000     
+ GASDEV RANDOM SAMPLING USING           12  POINTS
+ dx  0.13867504905630729       0.13867504905630729       0.13867504905630729     
+ VOL=  0.50794908747392775        23.808674242761064     
+ FINISHED SAMPLING          13          12 OUT OF          13
+ NQDim=           3   NBAS=           4
+ NORM=   1.0000000000000000     
+ KIN energy =    0.0000000000000000     
+ POT energy =   -148.87135502433313     
+ QP energy =    1.6654428261270018E-002
+ TOTAL energy =   -148.85470059607186     
+ t=   0.0000000000000000                1
+ t=   3.0000000000000000                2
+ t=   6.0000000000000000                3
+ t=   9.0000000000000000                4
+ t=   12.000000000000000                5
+ t=   15.000000000000000                6
+ t=   18.000000000000000                7
+ t=   21.000000000000000                8
+ t=   24.000000000000000                9
+ t=   27.000000000000000               10
+ t=   30.000000000000000               11
+ t=   33.000000000000000               12
+ t=   36.000000000000000               13
+ t=   39.000000000000000               14
+ t=   42.000000000000000               15
+ t=   45.000000000000000               16
+ t=   48.000000000000000               17
+ t=   51.000000000000000               18
+ t=   54.000000000000000               19
+ t=   57.000000000000000               20
+ t=   60.000000000000000               21
+ t=   63.000000000000000               22
+ t=   66.000000000000000               23
+ t=   69.000000000000000               24
+ t=   72.000000000000000               25
+ PRINTED IN ener: time,tot_en,q_pot,                         cl_pot,kin_qm,kin_cl
+ PRINTING POSITIONS UP TO           40  DIMENSIONS
+ SG: CLOSING FILES
+ SG: CLOSED FILES
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
