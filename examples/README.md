@@ -74,7 +74,9 @@ To use one of them, edit `IN_dftb`.
   potential energy agrees to 2e-12 relative. Over the run, the total
   energy in `ener` stays between 0.050685 and 0.050706.
 - **h-flake-111**: the largest system. This is the only example that uses a
-  nonzero quantum potential (`ipot=1`).
+  nonzero quantum potential (`ipot=1`). It currently stops while reading
+  `INdyn`, because line 6 has only one value where the code expects two.
+  See `docs/KNOWN_ISSUES.md` #2.
 
 ## Running
 

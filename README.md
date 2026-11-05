@@ -22,7 +22,7 @@ Makefile            builds qtes.x
 dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GNUmake.inc
 examples/           input sets and reference results, see examples/README.md
 tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
-docs/               original notes: file formats (sg-notes-files), code notes, sbatch script
+docs/               KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
 ```
 
 ## Requirements
@@ -95,7 +95,7 @@ example.
 | `h-c4h9-14-restart` | restart test, t = 80 to 100 from a checkpoint; matches the fresh run |
 | `h-c4h9-14` | quick smoke test (about 1 s) |
 | `h-flake-53` | 53-atom system, full reference output (run on 48 ranks) |
-| `h-flake-111` | 111-atom system with nonzero quantum potential, inputs only |
+| `h-flake-111` | 111-atom system with nonzero quantum potential, inputs only (currently fails on input, see docs/KNOWN_ISSUES.md #2) |
 
 `examples/README.md` gives the details for each example. A quick check after a
 code change:
@@ -117,6 +117,11 @@ The main outputs are `ener` (energies), `cor` (correlation function), `aver`
 `wf0` and `wft` (initial and final QT positions), and `qtx`...`clz` (20 QTs
 of the quantum atom and the first classical atom). `docs/sg-notes-files`
 gives the column-by-column formats.
+
+## Known issues
+
+Open bugs and behaviour that is easy to miss are listed in
+[`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 
 ## Known messages
 
