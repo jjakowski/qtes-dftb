@@ -1,0 +1,55 @@
+ ############################################
+
+  Parallel version of bohmd. Ver(17/08/2016)
+
+ ############################################
+ LAGRANGIAN DYNAMICS in REAL TIME
+ EHRENFEST: AVERAGE OVER QDOF           0
+ NO R-MOMENTUM FIT: QPOT=0
+ TOTAL NUMBER OF ATOMS           14
+ DIMENSIONALITY           42  QUANTUM DIM=           3
+           1  QUANTUM ATOMS: H 
+ ATOM TYPE:            2
+          13  CLASSICAL ATOMS: C C H H H C H H H C H H H 
+ ATOM TYPE:            1           1           2           2           2           1           2           2           2           1           2           2           2
+ TIME STEPS, SUBSTEPS, dt:            5          10   2.0000000000000000     
+ LEAVE MPI INPUT
+ dftb_init_mpi, myid=            3
+ dftb_init_mpi, myid=            2
+ dftb_init_mpi, myid=            1
+ dftb_init_mpi, myid=            0
+           0 :  done with dftb_init
+ INITIALIZE QTs           0           5          48           4
+ INITITAL WAVEFUNCTION: sampling cutoff =    2.0000000000000000     
+ width:
+   13.000000000000000        13.000000000000000        13.000000000000000     
+ position: 
+   0.0000000000000000        0.0000000000000000        8.7900336369477294     
+ momentum: 
+   0.0000000000000000        0.0000000000000000       -13.740000000000000     
+ GASDEV RANDOM SAMPLING USING           48  POINTS
+ dx  0.13867504905630729       0.13867504905630729       0.13867504905630729     
+ VOL=  0.50794908747392775        23.808674242761064     
+ FINISHED SAMPLING          49          48 OUT OF          49
+ NORM=   1.0000000000000007     
+ KIN energy =    5.1412745098039218E-002
+ POT energy =   0.11343946505306042     
+ QP energy =    0.0000000000000000     
+ TOTAL energy =   0.11343946505306042     
+ t=   0.0000000000000000                1
+ t=   20.000000000000000                2
+ t=   40.000000000000000                3
+ t=   60.000000000000000                4
+ t=   80.000000000000000                5
+ PRINTED IN ener: time,tot_en,q_pot,                         cl_pot,kin_qm,kin_cl
+ PRINTING POSITIONS UP TO           40  DIMENSIONS
+ SG: CLOSING FILES
+ SG: CLOSED FILES
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO

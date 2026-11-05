@@ -35,17 +35,16 @@ To use one of them, edit `IN_dftb`.
 | `h-flake-111`   | H + 110-atom C/H flake, `ipot=1` (linear p-fit QP) | 25 x 2, dt 3 | 12 | none |
 
 - **h-c4h9-14-ref**: this is the main regression test. `reference/` holds
-  the full output set from the original run (`ener`, `cor`, `aver`, `traj`,
-  `qt.dat`, `traj.sav`, `wft`, ...). The original `INdyn` had the restart flag
-  set to 1. It is now set to 0, so a run starts from t = 0 and reproduces the
-  reference. The original data was produced in two stages: a run from t = 0
-  to 80, then a restart from 80 to 100. As a result, `reference/wf0` holds
-  the t = 80 restart state, not t = 0. `reference/wft` holds two 48-row
-  blocks, t = 80 then t = 100, and a fresh run matches only the second
-  block. Also, `qtx/qty/qtz` and `clx/cly/clz` contain only the time
-  column, because of a bug in `aver` in `qtes.f`. The current gfortran +
-  OpenBLAS build reproduces `ener`, `aver`, `traj`, `cor` and `qt.dat` to
-  round-off (max relative difference about 1e-10).
+  the full output set (`ener`, `cor`, `aver`, `traj`, `qt.dat`, `traj.sav`,
+  `wf0`, `wft`, `qtx`...`clz`, plus `stdout.log`) from a fresh t = 0 to 100
+  run on 4 MPI ranks. The run used the gfortran + OpenBLAS build after the
+  `aver` fix, which restored the trajectory columns in `qtx/qty/qtz` and
+  `clx/cly/clz`. These results agree with the original Intel/MKL results to
+  round-off (max relative difference about 1e-10). The original results are
+  kept in git history, in commit `2ed84f9`. They were produced in two
+  stages, a run from t = 0 to 80 and a restart from 80 to 100, so their
+  `wf0` and `wft` differ in form. The timing files `trajt` and `dftbt`
+  differ from run to run.
 - **h-c4h9-14**: uses the same geometry as above with a much shorter run
   (about 1 s on 4 ranks). Use it for a quick build check.
 - **h-flake-53**: `reference/stdout.log` is the saved screen output of an

@@ -489,7 +489,7 @@ c
          write(11,1000) t,an,prob,(xav(i),i=1,npr)
          flush(11)
 !----------- print 20 QTs for the first quantum atom  -------
-         ip = min(np,20)
+         ip = min(n,20)
          write(15,1000) t,(x(1,j),j=1,ip)
          write(16,1000) t,(x(2,j),j=1,ip)
          write(17,1000) t,(x(3,j),j=1,ip)
