@@ -137,7 +137,7 @@ trajectory**:
 | Quantum-atom z in trajectory *i* | What `trot` does | Intended meaning |
 |---|---|---|
 | `qmn <= z <= qmx` | normal propagation | the atom is in the interaction region |
-| `z < qmn` | sets `w(i) = 0`, stops updating all positions in the trajectory, and skips DFTB | the atom has passed through or beyond the target, so the trajectory is **removed from the ensemble**. It no longer contributes to averages, energies, or the Ehrenfest force, and the norm in `aver` (column 2) drops below 1 |
+| `z < qmn` | sets `w(i) = 0` on every rank (right after the move that crosses `qmn`), stops updating all positions in the trajectory from the next substep on, and skips DFTB | the atom has passed through or beyond the target, so the trajectory is **removed from the ensemble**. It no longer contributes to averages, energies, or the Ehrenfest force, and the norm in `aver` (column 2) drops below 1 |
 | `z > qmx` | skips DFTB; the force is set to zero and the potential is frozen at its last value. The trajectory keeps moving with its weight (free flight) | the atom is far above the target, so the expensive DFTB call is avoided |
 
 Notes:
@@ -151,8 +151,9 @@ Notes:
   - F6 (fixed): with `ipot = 1`, too few QTs left inside the window
     made the fit fail with a rank-local `stop`. The run now stops
     cleanly on all ranks with a `QPOT ERROR`.
-  - #7: in the substep where a QT crosses `qmn`, ranks can briefly use
-    different weights.
+  - F7 (fixed): a QT crossing `qmn` was excluded only on its owning
+    rank, so the ranks' copies of the system drifted apart. It is now
+    excluded on every rank, right after the move.
   - F3 (fixed): the force loop zeroed an undefined weight `w(n)`.
     It now zeroes `w(ip)`.
   - F5 (fixed): forces outside the window were undefined. They are now

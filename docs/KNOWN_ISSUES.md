@@ -22,26 +22,6 @@ issue is fixed, move it to **Fixed** and note the commit.
   deferred, and it blocks the `h-flake-111` reference.
 - **Found:** 2026-11-05
 
-### 7. Weights can differ between MPI ranks for one substep (suspected)
-
-- **Where:** `qtes.f`, `subroutine trot`. The force loop sets `w(ip)=0`
-  only on the rank that owns QT `ip`. The Ehrenfest average that comes
-  right after the force loop then uses each rank's own copy of `w`.
-- **Problem:** in the substep where a QT first crosses `qmn`, the owning
-  rank drops it from the average of the classical forces, while the
-  other ranks still include it. The ranks then propagate slightly
-  different classical forces, so their copies of the trajectories can
-  drift apart. The next half-step zeroes `w` consistently on all ranks,
-  but by then the copies have already drifted.
-- **Evidence:** in the `qmn = 3.1` stress test of `h-flake-111` (see F6),
-  11 ranks failed the fit while rank 0 continued for another step.
-- **Impact:** this happens only when a QT crosses `qmn`. None of the
-  examples do.
-- **Likely fix:** zero `w(i)` for all QTs on all ranks right after the
-  position update, before `qpot` and the force loop. Alternatively,
-  synchronize `w` across ranks after the force loop.
-- **Found:** 2026-11-05
-
 ## Notes on behaviour (not bugs, but easy to miss)
 
 - **`IEEE_DENORMAL` in restart runs is harmless.** gfortran reports at
@@ -107,10 +87,8 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   undefined position, possibly out of bounds, and the trajectory's own
   weight was not zeroed until the next half-step.
 - **Fix:** `w(ip)=0d0` (2026-11-05), in the commit "Fix undefined weight
-  index w(n) in trot (issue #1)". Note that `w` is not communicated
-  between ranks after the force loop. The zero weight is therefore seen
-  only on the owning rank until the next half-step zeroes it on all
-  ranks.
+  index w(n) in trot (issue #1)". That zero weight was still seen only
+  on the owning rank. This was fixed later, in F7.
 - **Verification:**
   - All four examples are byte-identical before and after the fix,
     since none of them reaches this code path.
@@ -165,8 +143,9 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   (`dvlocal(:,ip)=0`) and freezes the potential at its last value
   (`vlocal(ip)=v(ip)`; `v` holds the previous step on all ranks)
   (2026-11-05). This is free flight, as chosen by the code author.
-  The below-`qmn` branch gets the same well-defined values, because its
-  zero weight is visible only on the owning rank for one substep (F3).
+  The below-`qmn` branch gets the same well-defined values. Since F7 its
+  weight is already zero on every rank, so the values are only a
+  safeguard.
 - **Behaviour to know:**
   - The total energy jumps by a small step when a trajectory re-enters
     the window and DFTB resumes. The size of the step is how much the
@@ -220,3 +199,40 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
     needs 4` at t = 46.5, followed by one clean `MPI_ABORT`.
   - The run with `ipot = 1` and `isr = 0` reports `DPOSV FAILED, info=3
     ... moment matrix singular ... (isr=0?)` at t = 0.
+
+### F7. Weights differed between MPI ranks after a QT crossed `qmn`
+
+- **Where:** `qtes.f`, `subroutine trot`.
+- **Background:** every rank keeps its own full copy of `q`, `p`, `s`
+  and `w` for all QTs. The copies stay identical only because all ranks
+  make the same updates. They are sent between ranks once, at the
+  start, and never again.
+- **Problem:**
+  - When a QT's quantum atom crossed below `qmn` during a substep, only
+    the rank that owns that QT set `w(ip)=0`, in the force loop.
+  - The Ehrenfest average that follows uses each rank's own `w`. The
+    owning rank therefore averaged the classical forces without that QT,
+    while every other rank still included it.
+  - As a result, the classical-atom momenta of all QTs were updated
+    differently on different ranks. From then on the ranks' copies of
+    the system drifted apart for the rest of the run. The next half-step
+    made `w` agree again, but `q` and `p` were never re-synchronized.
+- **Fix:** in the first half-step loop, which every rank runs for all
+  QTs, `w(i)=0` is now also set right after the move when
+  `q(3,i) < qmn` (2026-11-05), in the commit "Exclude QTs crossing qmn
+  on every rank (issue #7)". All ranks make this decision from
+  identical data, so no communication is needed. A crossing QT is
+  dropped from `qpot` and from the Ehrenfest average in the same
+  substep in which it crosses. The `w(ip)=0` in the force loop stays as
+  a harmless safeguard.
+- **Verification:**
+  - Scratch builds wrote a per-rank checksum (`sum q`, `sum p`,
+    `sum w`) after every substep. The test case was `h-flake-111` with
+    `qmn = 3.1` bohr on 12 ranks.
+  - Old code: the ranks were identical until the first in-step crossing
+    at t = 18. There `sum w` took 2 different values, and `sum q` and
+    `sum p` differed by up to 4e-4 relative, a difference that persisted
+    until the end of the run.
+  - Fixed code: all 12 ranks stayed bit-identical at every substep.
+  - All four examples are byte-identical before and after the fix,
+    since none of them crosses `qmn`.

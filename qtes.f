@@ -650,6 +650,9 @@ c--------------- normalize ----------------------------------
           s(i)=s(i)+p(k,i)**2*tau2(k)
 13      continue
          s(i)=s(i)-(v(i)+u(i))*dt2
+!---- crossed qmn during this move: exclude it now, on every rank, so
+!---- qpot and the Ehrenfest average see the same weights everywhere
+          if(q(3,i).lt.qmn) w(i)=0d0
 10	continue
         t=t+dt
         
