@@ -638,11 +638,16 @@ c--------------- normalize ----------------------------------
 !--------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	 do 13 k=1,nd
          if(k.le.nqd) then
-          if(ipot.eq.1) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
+!---- exactly one kick per quantum coordinate: ipot=1 full 3D quantum
+!---- force; otherwise DFTB force in x,y and DFTB + quantum force in z
+          if(ipot.eq.1) then
+           p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
+          else
           do j=3,nqd,3
           if(k.gt.(j-3).and.k.le.(j-1)) p(k,i)=p(k,i)-dv(k,i)*dt2
           if(k.eq.j) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
           enddo
+          endif
          else
           p(k,i)=p(k,i)-dv(k,i)*dt2
 	 endif
@@ -728,11 +733,16 @@ c  now collect all  potenials and forces from  MPI tasks
         do 11 i=1,np
 	 do 41 k=1,nd
          if(k.le.nqd) then
-          if(ipot.eq.1) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
+!---- exactly one kick per quantum coordinate: ipot=1 full 3D quantum
+!---- force; otherwise DFTB force in x,y and DFTB + quantum force in z
+          if(ipot.eq.1) then
+           p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
+          else
           do j=3,nqd,3
           if(k.gt.(j-3).and.k.le.(j-1)) p(k,i)=p(k,i)-dv(k,i)*dt2
           if(k.eq.j) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2
           enddo
+          endif
          else
           p(k,i)=p(k,i)-dv(k,i)*dt2
          endif

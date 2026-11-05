@@ -111,8 +111,10 @@ three places: `init_traj` (initial forces), `trot` (every substep), and
   With only a few QTs the fit is ill-conditioned, and the quantum force
   can become very large even before that stop. Use enough sampled QTs
   (`KNOWN_ISSUES.md` F6).
-- Likely bug: with `ipot = 1`, the force on the quantum atom is
-  applied twice in each half-step (`KNOWN_ISSUES.md` #5).
+- Each quantum coordinate gets exactly one kick per half-step. With
+  `ipot = 1` this kick is the DFTB force plus the quantum force in all
+  directions. This was fixed in `KNOWN_ISSUES.md` F8; before that fix
+  the force was applied twice.
 
 ## `isr`, `pow`: initial sampling
 

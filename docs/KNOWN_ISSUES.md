@@ -5,22 +5,7 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 5. `trot`: with `ipot = 1`, the quantum-atom force is applied twice (likely bug)
-
-- **Where:** `qtes.f`, `subroutine trot`, both momentum half-steps
-  (the lines `if(ipot.eq.1) p(k,i)=p(k,i)-(dv(k,i)+du(k,i))*dt2`)
-- **Problem:** for each quantum coordinate, the `ipot.eq.1` line
-  subtracts `(dv+du)*dt2`. The loop over components that follows then
-  subtracts the force again: `dv*dt2` for x and y, and `(dv+du)*dt2`
-  for z. The total kick is `2dv+du` in x and y and `2(dv+du)` in z,
-  instead of `dv+du`. The per-component loop was probably meant for
-  `ipot != 1` only, as an `else` branch.
-- **Impact:** this affects only `ipot = 1` runs. Of the examples, only
-  `h-flake-111` uses `ipot = 1`. Its results, including its reference
-  data if one is added, may therefore contain this error.
-- **Status:** likely bug. The code author agrees (2026-11-05). The fix is
-  deferred, and it blocks the `h-flake-111` reference.
-- **Found:** 2026-11-05
+No open issues (2026-11-05).
 
 ## Notes on behaviour (not bugs, but easy to miss)
 
@@ -236,3 +221,37 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   - Fixed code: all 12 ranks stayed bit-identical at every substep.
   - All four examples are byte-identical before and after the fix,
     since none of them crosses `qmn`.
+
+### F8. `trot`: with `ipot = 1`, the quantum-atom force was applied twice
+
+- **Where:** `qtes.f`, `subroutine trot`, both momentum half-steps.
+- **Problem:**
+  - For each quantum coordinate, the line
+    `if(ipot.eq.1) p=p-(dv+du)*dt2` gave a full kick.
+  - The per-component loop that follows ran for every `ipot`, and it
+    kicked the same coordinate again: `dv` in x and y, `dv+du` in z.
+  - With `ipot = 1` the total kick was therefore `2dv+du` in x and y,
+    and `2(dv+du)` in z. The H felt twice the DFTB force, while the
+    energy written to `ener` assumes a single force, so the equations of
+    motion did not match the reported energy.
+  - The loop alone is correct for `ipot = 0` and `ipot = 2` (QP along
+    z). The `ipot = 1` line had been added without making the two
+    alternatives.
+- **Fix:** the `ipot = 1` line and the per-component loop are now
+  `if/else` alternatives (2026-11-05), in the commit "Apply the
+  quantum-atom force once with ipot=1 (issue #5)". Every quantum
+  coordinate now gets exactly one kick per half-step. `ipot = 0` and
+  `ipot = 2` are unchanged.
+- **Evidence:** energy conservation, max |E - E0|, before -> after the
+  fix:
+
+  | Case | Double kick | Single kick |
+  |---|---|---|
+  | `h-flake-111` (chemisorbed H, 12 QTs, t = 0 to 75) | 1.3e-3 Ha | < 1e-4 Ha (no change in the 7 printed digits) |
+  | `h-c4h9-14-ref` inputs with `ipot=1 isr=1` (incoming H, 48 QTs, t = 0 to 100) | 2.5e-3 Ha, steady drift | 2.3e-6 Ha |
+
+- **Verification:**
+  - The three `ipot = 0` examples are byte-identical before and after
+    the fix, with their references unchanged.
+  - `h-flake-111` changed as intended.
+  - Its first reference was created from the fixed code.
