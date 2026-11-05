@@ -671,7 +671,7 @@ c      Last task (myid=numprocs-1)  is under-employed
         do 24 ip=ip0,ip1        
 !---<<<<<<<< exclude the fringe QM trajectories <<<<<<<<<<<
           if(q(3,ip).lt.qmn) then
-           w(n)=0d0
+           w(ip)=0d0
            goto 24
           endif
           if(q(3,ip).gt.qmx) goto 24

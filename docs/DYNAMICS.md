@@ -140,9 +140,12 @@ Notes:
 
 - An equivalent `z > qmx` check in the position update is commented out
   (`qtes.f`, first half-step of `trot`).
-- Bugs in this path:
-  - #1: the wrong weight is zeroed in the force loop.
+- Known issues in this path:
   - #4: the forces are undefined for trajectories above `qmx`.
+  - #6: with `ipot = 1`, the quantum-force fit fails if too few
+    trajectories remain inside the window.
+  - F3 (fixed): the force loop zeroed an undefined weight `w(n)`.
+    It now zeroes `w(ip)`.
   - Momenta of excluded trajectories still change in the second
     half-step. This is harmless, because their weight is 0.
 - Most examples use `-15 15` bohr; `h-flake-53` uses `-15 50`. In the

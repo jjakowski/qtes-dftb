@@ -5,23 +5,6 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 1. `trot`: wrong weight zeroed for trajectories below `qmn`
-
-- **Where:** `qtes.f`, `subroutine trot`, force loop `do 24 ip=ip0,ip1`
-- **Problem:** if a trajectory's quantum atom goes below `qmn` (the
-  z-range set in `INxyz`), the loop runs `w(n)=0d0` and skips that
-  trajectory. The loop index is `ip`, and `n` has an unrelated value at
-  that point, so the wrong weight gets zeroed, or none at all. The
-  half-step loop earlier in `trot` uses the correct index (`w(i)=0d0`).
-- **Impact:** this only happens when a trajectory goes below `qmn`.
-  None of the current examples reach that point, so their results are
-  not affected. Also, the momenta of excluded trajectories are still
-  updated in the second half-step. That is harmless, because their
-  weight is 0.
-- **Likely fix:** `w(ip)=0d0`. This is the same kind of bug as fixed
-  issue F1.
-- **Found:** 2026-11-05
-
 ### 3. Floating-point divide-by-zero at runtime
 
 - **Symptom:** every run prints `IEEE_DIVIDE_BY_ZERO` at exit, in all
@@ -64,6 +47,28 @@ issue is fixed, move it to **Fixed** and note the commit.
   data if one is added, may therefore contain this error.
 - **Status:** likely bug. The code author agrees (2026-11-05). The fix is
   deferred, and it blocks the `h-flake-111` reference.
+- **Found:** 2026-11-05
+
+### 6. `ipot = 1` fit fails when too few trajectories remain
+
+- **Where:** `qtes.f`, `subroutine qpot`. The linear quantum-force fit
+  solves a least-squares system with `NBAS = nqd + 1` basis functions
+  (4 for one quantum atom).
+- **Problem:** the fit needs at least `NBAS` trajectories with nonzero
+  weight, and in practice more, spread out in space. If too many
+  trajectories are excluded below `qmn`, or if all trajectories coincide
+  (`isr = 0`), the system is singular. The code then prints
+  `DPOSV FAILED` and continues with a garbage quantum force, and the
+  energy blows up.
+- **Seen in:** a stress test (2026-11-05) of `h-flake-111` with `qmn`
+  raised to 3.1 bohr. The surviving trajectories dropped 12 -> 8 -> 7 ->
+  5 -> 3. At 3 remaining, the fit failed (t ~ 46), and the kinetic energy
+  jumped to ~1e20 Ha. The pre-fix and post-fix binaries for issue F3
+  behave the same way here.
+- **Impact:** none of the examples are affected (`h-flake-111` uses the
+  default `qmn = -15`).
+- **Likely fix:** stop with a clear message when `DPOSV` fails, or when
+  fewer than `NBAS` weighted trajectories remain, instead of continuing.
 - **Found:** 2026-11-05
 
 ## Notes on behaviour (not bugs, but easy to miss)
@@ -115,3 +120,26 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   with quantum effects. The author confirmed this was the intent
   (2026-11-05). Fixed in the commit "Fix h-flake-111 inputs: chemisorbed
   H with sampling on".
+
+### F3. `trot`: undefined weight index for trajectories below `qmn`
+
+- **Where:** `qtes.f`, `subroutine trot`, force loop `do 24 ip=ip0,ip1`
+- **Problem:** if a trajectory's quantum atom went below `qmn`, the
+  loop set `w(n)=0d0`. `n` is never assigned in `trot` (it is an
+  implicitly typed, uninitialized local), so the write went to an
+  undefined position, possibly out of bounds, and the trajectory's own
+  weight was not zeroed until the next half-step.
+- **Fix:** `w(ip)=0d0` (2026-11-05), in the commit "Fix undefined weight
+  index w(n) in trot (issue #1)". Note that `w` is not communicated
+  between ranks after the force loop. The zero weight is therefore seen
+  only on the owning rank until the next half-step zeroes it on all
+  ranks.
+- **Verification:**
+  - All four examples are byte-identical before and after the fix,
+    since none of them reaches this code path.
+  - A stress test with `qmn = 3.1` bohr in `h-flake-111` exercises the
+    path. Its results match the pre-fix binary up to the first
+    in-step crossing (t = 18), then differ, as expected.
+- **Remaining:** the momenta of excluded trajectories are still updated
+  in the second half-step. This is harmless, because their weight is
+  0.
