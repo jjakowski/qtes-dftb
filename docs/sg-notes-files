@@ -47,23 +47,30 @@ nqd==number of QDOF; np== number of trajectories (QTs);
  14 'pfit'    the r-fitting coefficients b as a function of time (LQF n1=2  currently) for QDOFs
 	 	time,((b(j,i),j=1,n1),i=1,nqd)
 
- 15 'qtx'	x-position of the first quantum particle for up to 20 QTs 
-		time, (x(1,j),j=1,min(20,np))
- 16 'qty'	y-position of the first quantum particle for up to 20 QTs 
-		time, (x(2,j),j=1,min(20,np))
- 17 'qtz'	z-position of the first quantum particle for up to 20 QTs 
-		time, (x(3,j),j=1,min(20,np))
+ 15 'qtx'	x-position of the first quantum particle for up to nqtprt QTs
+		time, (x(1,j),j=1,min(nqtprt,np))
+ 16 'qty'	y-position of the first quantum particle for up to nqtprt QTs
+		time, (x(2,j),j=1,min(nqtprt,np))
+ 17 'qtz'	z-position of the first quantum particle for up to nqtprt QTs
+		time, (x(3,j),j=1,min(nqtprt,np))
+	nqtprt = optional 3rd value on INdyn line 9 (default 20, <=0 = all QTs)
 
  19 'ener' 	average energy components: total, <QP>, <V>,  enq/enc is <K> for QDOFs/CDOFs
 		time, ,en,qp,vav,enq,enc
 		
 
- 25 'clx'	x-position of the first classical particle for up to 20 QTs
-		time, (x(nqd+1,j),j=1,min(20,np))
- 26 'cly'	y-position of the first classical particle for up to 20 QTs
-		time, (x(nqd+2,j),j=1,min(20,np))
- 27 'clz'	z-position of the first classical particle for up to 20 QTs
-		time, (x(nqd+3,j),j=1,min(20,np))
+ 25 'clx'	x-positions of classical atoms (layout depends on ipf, see below)
+ 26 'cly'	y-positions of classical atoms
+ 27 'clz'	z-positions of classical atoms
+	ipf=0 (Ehrenfest; classical atoms identical in all QTs):
+		up to nclprt classical atoms, taken from the first QT with w>0
+		time, (x(nqd+3*m-2,j0),m=1,min(nclprt,ncl))   (clx; cly/clz: -1/0)
+		nclprt = optional 4th value on INdyn line 9 (default 20, <=0 = all)
+		ncl = number of classical atoms
+	ipf.ne.0 (classical atoms differ between QTs):
+		first classical atom for up to nqtprt QTs
+		time, (x(nqd+1,j),j=1,min(nqtprt,np))          (cly/clz: nqd+2/nqd+3)
+	all atoms quantum (nd=nqd): second atom for up to nqtprt QTs
 
  28 'wf0'	initial positions of all trajectories upto 40 dimensions
 		(x(i,k),k=1,40),i=1,np)

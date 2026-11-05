@@ -19,6 +19,12 @@ examples/
     reference/        results from earlier runs (only where available)
 ```
 
+Line 9 of `INdyn` can also hold two optional print counts after the
+number of QTs and the restart flag: `nqtprt` (QTs in `qtx..qtz`) and
+`nclprt` (classical atoms in `clx..clz`). Both default to 20, and a value
+of 0 or less means "all". None of the examples set them, so the examples
+also test the defaults. See the top-level `README.md`.
+
 The code expects the input files to have exactly these names. `IN_dftb`
 selects `cc.spl`, `ch-g2ms.spl`, `hc-g2ms.spl` and `hh.spl`. The `*-b3.spl`
 files and the plain `ch.spl`/`hc.spl` are alternative C-H parameterizations.

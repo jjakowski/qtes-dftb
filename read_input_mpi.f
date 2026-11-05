@@ -22,6 +22,8 @@
       common/molecule/asymbol,nat
       common/pot_xyz/ qc(3,ndx),ql,qls,dw,sc,esh,dch,zh,ch,bnd
       common/traj_cut/qmn,qmx
+      common/prtopt/nqtprt,nclprt
+      character*256 line9
        dl=1.0d0 !      lattice constant
 
 c
@@ -65,7 +67,21 @@ c
         read(9,*) ipot,isr
         read(9,*) pow
         read(9,*) ipf
-        read(9,*) np,ist
+!--- line 9: np ist [nqtprt [nclprt]]; optional values default to 20 ---
+!--- nqtprt: QTs printed in qtx/qty/qtz; nclprt: classical atoms in  ---
+!--- clx/cly/clz (Ehrenfest mode); a value <= 0 means print all      ---
+        nqtprt=20
+        nclprt=20
+        read(9,'(a)') line9
+        read(line9,*,iostat=ios) np,ist,nqtprt,nclprt
+        if(ios.ne.0) then
+         nclprt=20
+         read(line9,*,iostat=ios) np,ist,nqtprt
+         if(ios.ne.0) then
+          nqtprt=20
+          read(line9,*) np,ist
+         endif
+        endif
 !-------------- total number of dimensions  ---------------------
         nd=nat*3
         nqd=nq*3
@@ -138,6 +154,8 @@ c----------------------------------------------------------------
          write(*,*)'ATOM TYPE: ', (iat(j),j=nq+1,nat)
          write(*,*)'TIME STEPS, SUBSTEPS, dt: ',
      &          kmax,kout,dt
+         write(*,*)'PRINT OPTIONS nqtprt, nclprt (<=0: all): ',
+     &          nqtprt,nclprt
         write(*,*) 'LEAVE MPI INPUT'
 c---------- SG read trajectory arrays ---------------
         if(ist.ne.0) then

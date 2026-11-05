@@ -24,6 +24,7 @@
      &          ipot,ipf,nqd,kmax,kout,krst
         common/molecule/asymbol,nat
         common/chk/xsv(ndx*npx),psv(ndx,npx),ssv(npx),wsv(npx),ist
+        common/prtopt/nqtprt,nclprt
         character dum*80, name1*1,name2*2, name3*3,name4*4
         !parameter (MDV=10000000)
         !real*8  VV(MDV)             !scratch array / buffer
@@ -71,6 +72,10 @@
         call mpi_bcast(s,np,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,
      $        ierr)
         call mpi_bcast(w,np,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,
+     $        ierr)
+        call mpi_bcast(nqtprt,1,MPI_INTEGER,0,MPI_COMM_WORLD,
+     $        ierr)
+        call mpi_bcast(nclprt,1,MPI_INTEGER,0,MPI_COMM_WORLD,
      $        ierr)
 
 !------ setup dftb, read  SK files     -------------------------------     
@@ -447,6 +452,11 @@ c  now collect all potentials and from  all Mpi tasks
 	real*8 w(n),x(ndx,npx),s(n),p(ndx,npx),xav(ndx)
         common/pot_xyz/ qc(3,ndx),ql,qls,dw,sc,esh,dch,zh,ch,bnd
         common/wf/a0(nqx,nqx),q0(ndx),p0(ndx)
+!--- /prop/ is needed only for ipf; nqd is an argument here, so the ---
+!--- other members get local names (storage association) -----------
+        common/prop/pdt,pdt2,ptau(ndx),ptau2(ndx),pam(ndx)
+     &          ,ipot,ipf,ipnqd,ipkmax,ipkout,ipkrst
+        common/prtopt/nqtprt,nclprt
 !------------------ normalize ------------------------
 c        if(t.lt.1d-10) then
 c        write(*,*) t
@@ -488,16 +498,36 @@ c
          npr = min(40,nd)
          write(11,1000) t,an,prob,(xav(i),i=1,npr)
          flush(11)
-!----------- print 20 QTs for the first quantum atom  -------
-         ip = min(n,20)
+!----------- print nqtprt QTs for the first quantum atom (<=0: all) --
+         ip = n
+         if(nqtprt.gt.0) ip = min(n,nqtprt)
          write(15,1000) t,(x(1,j),j=1,ip)
          write(16,1000) t,(x(2,j),j=1,ip)
          write(17,1000) t,(x(3,j),j=1,ip)
          flush(15)
          flush(16)
          flush(17)
-!----------- print  20 CTs for the first classical atom ------
-         if(nd.gt.nqd) then
+!----------- Ehrenfest (ipf=0): classical atoms are the same in all QTs,
+!----------- print nclprt classical atoms (<=0: all) from the first QT
+!----------- with nonzero weight ------------------------------------------
+         if(nd.gt.nqd.and.ipf.eq.0) then
+           ncl = (nd-nqd)/3
+           ic = ncl
+           if(nclprt.gt.0) ic = min(ncl,nclprt)
+           j0 = 1
+           do j=n,1,-1
+            if(w(j).gt.0d0) j0 = j
+           enddo
+           write(25,1000) t,(x(nqd+3*m-2,j0),m=1,ic)
+           write(26,1000) t,(x(nqd+3*m-1,j0),m=1,ic)
+           write(27,1000) t,(x(nqd+3*m,  j0),m=1,ic)
+           flush(25)
+           flush(26)
+           flush(27)
+           endif
+!----------- ipf.ne.0: classical atoms differ between QTs,
+!----------- print the first classical atom for ip QTs ---------------
+         if(nd.gt.nqd.and.ipf.ne.0) then
            n1=nqd+1
            write(25,1000) t,(x(n1,j),j=1,ip)
            write(26,1000) t,(x(n1+1,j),j=1,ip)
@@ -516,8 +546,8 @@ c
            flush(26)
            flush(27)
            endif
-         endif  
-1000   format(1000(e12.5,1x))
+         endif
+1000   format(*(e12.5,1x))
        return
        end
 !-------------------------------------------------------------

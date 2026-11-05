@@ -114,9 +114,26 @@ The timing files `trajt` and `dftbt` always differ from run to run.
 The main outputs are `ener` (energies), `cor` (correlation function), `aver`
 (norm, bonding probability, average positions), `traj` (representative QT),
 `qt.dat` (all QTs at every large step), `traj.sav` (restart checkpoint),
-`wf0` and `wft` (initial and final QT positions), and `qtx`...`clz` (20 QTs
-of the quantum atom and the first classical atom). `docs/sg-notes-files`
-gives the column-by-column formats.
+`wf0` and `wft` (initial and final QT positions), and `qtx`...`clz`.
+`docs/sg-notes-files` gives the column-by-column formats.
+
+- `qtx/qty/qtz` give the quantum atom's x/y/z coordinate for up to
+  `nqtprt` QTs.
+- `clx/cly/clz` depend on the mode. In Ehrenfest mode (`ipf = 0`), they
+  give up to `nclprt` classical atoms from one QT, because the classical
+  atoms are the same in every QT. Otherwise, they give the first classical
+  atom for up to `nqtprt` QTs.
+
+Both counts are optional values on line 9 of `INdyn`, after the number of
+QTs and the restart flag:
+
+```
+48 0              \  defaults: nqtprt = 20, nclprt = 20
+48 0 48 0         \  48 QTs in qtx..qtz, all classical atoms in clx..clz
+```
+
+A value of 0 or less means "all". The values in use are printed in
+`stdout.log` as `PRINT OPTIONS`.
 
 ## Dynamics modes
 

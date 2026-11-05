@@ -30,7 +30,8 @@ refer to the input files. For bugs in these code paths, see
 | `isr` | `INdyn` line 6, 2nd value | 0 = no sampling (all QTs at the wavepacket centre); 1 = Gaussian sampling | `init_traj` |
 | `pow` | `INdyn` line 7 | sampling cutoff: keep points with Gaussian weight > 10^-pow | `init_traj` |
 | `ipf` | `INdyn` line 8 | 0 = Ehrenfest; any other value = independent classical copies | `init_traj`, `trot`, `set_traj` |
-| `np`, restart | `INdyn` line 9 | number of QTs; 0 = start fresh, 1 = restart from `traj.sav` | `read_input_mpi`, `set_traj` |
+| `np`, restart | `INdyn` line 9, values 1-2 | number of QTs; 0 = start fresh, 1 = restart from `traj.sav` | `read_input_mpi`, `set_traj` |
+| `nqtprt`, `nclprt` | `INdyn` line 9, optional values 3-4 | QTs printed in `qtx..qtz` / classical atoms in `clx..clz` (default 20 each; 0 or less = all) | `read_input_mpi`, `aver` |
 | `qmn`, `qmx` | `INxyz` line 6 | z-window (bohr) for the quantum atom | `trot` |
 
 All current examples use `ipot=0`, `isr=0` and `ipf=0`, except
@@ -68,6 +69,18 @@ three places: `init_traj` (initial forces), `trot` (every substep), and
 - The trajectories are coupled only through the quantum potential
   (`ipot != 0`), and only in the quantum coordinates. With `ipot = 0`,
   the trajectories are fully independent.
+
+### Effect on output
+
+- In both modes, `qtx/qty/qtz` give the quantum atom's x/y/z coordinate
+  for up to `nqtprt` QTs.
+- What `clx/cly/clz` contain depends on the mode (`aver` in `qtes.f`):
+  - **`ipf = 0`:** the classical atoms are the same in every QT, so the
+    files give up to `nclprt` classical atoms, one atom per column. The
+    values are taken from the first QT with nonzero weight.
+  - **`ipf != 0`:** the classical atoms differ between QTs, so the files
+    give the first classical atom, one QT per column, for up to `nqtprt`
+    QTs.
 
 ### Caveats for both modes
 
