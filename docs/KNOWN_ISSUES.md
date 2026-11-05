@@ -5,24 +5,6 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 4. `trot`: undefined forces for trajectories above `qmx`
-
-- **Where:** `qtes.f`, `subroutine trot`, force loop:
-  `if(q(3,ip).gt.qmx) goto 24`
-- **Problem:** for a trajectory whose quantum atom is above `qmx`, the
-  loop skips the DFTB call. `vlocal(ip)` and `dvlocal(:,ip)` are then
-  left unset. These are local arrays that are never initialized, and
-  with `-fopenmp` they live on the stack. The code still gathers them
-  with `mpi_gather` and uses them as that trajectory's potential and
-  forces, so the trajectory gets garbage values.
-- **Impact:** this only happens when a trajectory's quantum atom goes
-  above `qmx`. None of the current examples reach that point.
-- **Likely fix:** this needs the author's intent. One option is to set
-  the potential and force to zero (free flight far from the target).
-  Another is to keep the previous step's values, for example by copying
-  `v`/`dv` into `vlocal`/`dvlocal` before the loop.
-- **Found:** 2026-11-05
-
 ### 5. `trot`: with `ipot = 1`, the quantum-atom force is applied twice (likely bug)
 
 - **Where:** `qtes.f`, `subroutine trot`, both momentum half-steps
@@ -166,3 +148,34 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   after the fix, and the divide-by-zero and invalid messages are gone.
   The restart example still reports `IEEE_DENORMAL`, which is harmless
   (see the notes above).
+
+### F5. `trot`: undefined forces for trajectories outside the z-window
+
+- **Where:** `qtes.f`, `subroutine trot`, force loop `do 24 ip=ip0,ip1`
+- **Problem:**
+  - For a trajectory whose quantum atom was above `qmx` (or below
+    `qmn`), the loop skipped DFTB with `goto 24`, which left
+    `vlocal(ip)`/`dvlocal(:,ip)` unset.
+  - These are uninitialized local arrays; with `-fopenmp` they live on
+    the stack. They were still gathered and broadcast into `v`/`dv`, so
+    the trajectory moved with undefined forces, which could be stale
+    values or garbage.
+  - With `ipf = 0`, the garbage also entered the Ehrenfest average,
+    because the trajectory keeps its weight above `qmx`. It therefore
+    corrupted the classical forces of every trajectory.
+- **Fix:** outside the window, the code now sets the force to zero
+  (`dvlocal(:,ip)=0`) and freezes the potential at its last value
+  (`vlocal(ip)=v(ip)`; `v` holds the previous step on all ranks)
+  (2026-11-05). This is free flight, as chosen by the code author.
+  The below-`qmn` branch gets the same well-defined values, because its
+  zero weight is visible only on the owning rank for one substep (F3).
+- **Behaviour to know:**
+  - The total energy jumps by a small step when a trajectory re-enters
+    the window and DFTB resumes. The size of the step is how much the
+    true potential changed while it was frozen.
+  - Choose `qmx` where the potential is flat. In a deliberately harsh
+    test, `h-c4h9-14-ref` with `qmx = 8.5` bohr (about 6 bohr above the
+    C-H group), the step was -2.2e-5 Ha. The H flew at constant momentum
+    until z < 8.5, and then followed DFTB forces.
+- **Verification:** all four examples are byte-identical before and
+  after the fix, since none of them leaves the window.

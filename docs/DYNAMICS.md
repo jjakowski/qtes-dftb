@@ -134,18 +134,22 @@ trajectory**:
 |---|---|---|
 | `qmn <= z <= qmx` | normal propagation | the atom is in the interaction region |
 | `z < qmn` | sets `w(i) = 0`, stops updating all positions in the trajectory, and skips DFTB | the atom has passed through or beyond the target, so the trajectory is **removed from the ensemble**. It no longer contributes to averages, energies, or the Ehrenfest force, and the norm in `aver` (column 2) drops below 1 |
-| `z > qmx` | skips the DFTB call; the trajectory keeps moving with its weight | the atom is far above the target, so the expensive DFTB call is avoided |
+| `z > qmx` | skips DFTB; the force is set to zero and the potential is frozen at its last value. The trajectory keeps moving with its weight (free flight) | the atom is far above the target, so the expensive DFTB call is avoided |
 
 Notes:
 
 - An equivalent `z > qmx` check in the position update is commented out
   (`qtes.f`, first half-step of `trot`).
+- Free flight above `qmx` means the total energy takes a small step
+  when a trajectory re-enters the window and DFTB resumes. Choose `qmx`
+  where the potential is flat (see `KNOWN_ISSUES.md` F5).
 - Known issues in this path:
-  - #4: the forces are undefined for trajectories above `qmx`.
   - #6: with `ipot = 1`, the quantum-force fit fails if too few
     trajectories remain inside the window.
   - F3 (fixed): the force loop zeroed an undefined weight `w(n)`.
     It now zeroes `w(ip)`.
+  - F5 (fixed): forces outside the window were undefined. They are now
+    zero, with the potential frozen.
   - Momenta of excluded trajectories still change in the second
     half-step. This is harmless, because their weight is 0.
 - Most examples use `-15 15` bohr; `h-flake-53` uses `-15 50`. In the

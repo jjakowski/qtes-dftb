@@ -670,11 +670,16 @@ c      Last task (myid=numprocs-1)  is under-employed
         !do 24 i=1,np
         do 24 ip=ip0,ip1        
 !---<<<<<<<< exclude the fringe QM trajectories <<<<<<<<<<<
-          if(q(3,ip).lt.qmn) then
-           w(ip)=0d0
+!---- outside the z-window DFTB is skipped: zero force, potential
+!---- frozen at its last value (v holds the previous step on all ranks)
+          if(q(3,ip).lt.qmn.or.q(3,ip).gt.qmx) then
+           if(q(3,ip).lt.qmn) w(ip)=0d0
+           vlocal(ip)=v(ip)
+           do k=1,ndx
+            dvlocal(k,ip)=0d0
+           enddo
            goto 24
           endif
-          if(q(3,ip).gt.qmx) goto 24
 !--------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !         call derivs0(nd,iat,q(1,i),v(i),dv(1,i))
 !         call derivs0(nd,iat,q(1,ip),vlocal(ip),dvlocal(1,ip))      !<-- old (fit)
