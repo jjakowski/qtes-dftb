@@ -35,7 +35,8 @@ refer to the input files. For bugs in these code paths, see
 | `qmn`, `qmx` | `INxyz` line 6 | z-window (bohr) for the quantum atom | `trot` |
 
 All current examples use `ipot=0`, `isr=0` and `ipf=0`, except
-`h-flake-111`, which uses `ipot=1`.
+`h-flake-111`, which uses `ipot=1` and `isr=1` (a chemisorbed H with the
+quantum potential and sampling).
 
 ## `ipf`: Ehrenfest vs independent classical copies
 

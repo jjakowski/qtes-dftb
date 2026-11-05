@@ -40,7 +40,7 @@ To use one of them, edit `IN_dftb`.
 | `h-c4h9-14-restart` | same system, restart from t = 80 | 5 x 10, dt 20 (runs t = 80 to 100) | 48 | full output set |
 | `h-c4h9-14`     | same system | 2 x 4, dt 10 (short smoke test) | 48 | none |
 | `h-flake-53`    | H + 52-atom C/H flake | 10 x 3, dt 10 (t = 0 to 100) | 48 | full output set + old screen log |
-| `h-flake-111`   | H + 110-atom C/H flake, `ipot=1` (linear p-fit QP) | 25 x 2, dt 3 | 12 | none |
+| `h-flake-111`   | chemisorbed H on a 110-atom C/H flake, `ipot=1`, `isr=1` | 25 x 2, dt 3 (t = 0 to 75) | 12 | none |
 
 - **h-c4h9-14-ref**: this is the main regression test. `reference/` holds
   the full output set (`ener`, `cor`, `aver`, `traj`, `qt.dat`, `traj.sav`,
@@ -79,10 +79,15 @@ To use one of them, edit `IN_dftb`.
   sampling, the norm and the kinetic energy are identical, and the DFTB
   potential energy agrees to 2e-12 relative. Over the run, the total
   energy in `ener` stays between 0.050685 and 0.050706.
-- **h-flake-111**: the largest system. This is the only example that uses a
-  nonzero quantum potential (`ipot=1`). It currently stops while reading
-  `INdyn`, because line 6 has only one value where the code expects two.
-  See `docs/KNOWN_ISSUES.md` #2.
+- **h-flake-111**: the largest system. Unlike the other examples, the H
+  is not incoming. It starts chemisorbed on C2 (C-H about 1.12 A) at
+  rest. This is the only example that uses the quantum potential
+  (`ipot=1`, a linear quantum-force fit) and Gaussian sampling
+  (`isr=1`), with 12 QTs spread around the H position. A run takes
+  about 25 s on 12 ranks: the C-H bond vibrates, and the total energy
+  is conserved to about 1e-5 relative. The input was repaired on
+  2026-11-05 (`docs/KNOWN_ISSUES.md` F2). The `ipot=1` code path has a
+  suspected bug, issue #5.
 
 ## Running
 

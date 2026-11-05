@@ -22,18 +22,6 @@ issue is fixed, move it to **Fixed** and note the commit.
   issue F1.
 - **Found:** 2026-11-05
 
-### 2. `h-flake-111` example fails when reading `INdyn`
-
-- **Where:** `examples/h-flake-111/INdyn`, line 6. The value is read in
-  `read_input_mpi.f:65`, `read(9,*) ipot,isr`.
-- **Problem:** line 6 contains only one value (`1  \ipot, ...`), but
-  the code reads two values, `ipot` and `isr`. The run stops at once
-  with `Fortran runtime error: Bad integer for item 2 in list input`.
-  The input file predates the `isr` sampling flag.
-- **Likely fix:** change line 6 to `1 0` (`ipot=1`, sampling off), which
-  matches the other examples. Use `1 1` if Gaussian sampling is wanted.
-- **Found:** 2026-11-05 (confirmed by a test run)
-
 ### 3. Floating-point divide-by-zero at runtime
 
 - **Symptom:** every run prints `IEEE_DIVIDE_BY_ZERO` at exit, in all
@@ -72,7 +60,8 @@ issue is fixed, move it to **Fixed** and note the commit.
   instead of `dv+du`. The per-component loop was probably meant for
   `ipot != 1` only, as an `else` branch.
 - **Impact:** this affects only `ipot = 1` runs. Of the examples, only
-  `h-flake-111` uses `ipot = 1`, and it currently fails on input (#2).
+  `h-flake-111` uses `ipot = 1`. Its results, including its reference
+  data if one is added, may therefore contain this error.
 - **Status:** suspected. Confirm with the code author before fixing.
 - **Found:** 2026-11-05
 
@@ -106,3 +95,22 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   `ip = min(np,20)`. As a result, no trajectory columns were printed.
 - **Fix:** `ip = min(n,20)`, in commit `ccf8435` (2026-11-05). The
   reference outputs were regenerated.
+
+### F2. `h-flake-111` example could not run
+
+- **Where:** `examples/h-flake-111/INdyn`
+- **Problem 1:** line 6 had only `ipot` (`1`), but the code reads two
+  values, `ipot` and `isr`, so the run stopped with `Bad integer for
+  item 2 in list input`. The file predates the `isr` flag.
+- **Problem 2:** the H line shifted the H by z0 = -2.0 bohr. `INxyz`
+  already places this H chemisorbed, 1.118 A above C2, so the shift
+  left it 0.06 A from C2. DFTB then failed on the first step
+  (`ewevge: ier = 746`, overlap matrix not positive definite). The
+  `INdyn` file was probably written for a different `INxyz` geometry.
+- **Problem 3:** with `isr = 0`, all trajectories are identical, so
+  the `ipot = 1` quantum-force fit is singular (`DPOSV FAILED`).
+- **Fix:** line 6 changed to `1 1` (`ipot=1`, sampling on), and the H
+  shift changed to z0 = 0. The example now simulates a chemisorbed H
+  with quantum effects. The author confirmed this was the intent
+  (2026-11-05). Fixed in the commit "Fix h-flake-111 inputs: chemisorbed
+  H with sampling on".
