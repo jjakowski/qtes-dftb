@@ -33,7 +33,7 @@ To use one of them, edit `IN_dftb`.
 | `h-c4h9-14-ref` | H + C4H9 cluster, 14 atoms | 5 x 10, dt 20 (t = 0 to 100) | 48 | full output set |
 | `h-c4h9-14-restart` | same system, restart from t = 80 | 5 x 10, dt 20 (runs t = 80 to 100) | 48 | full output set |
 | `h-c4h9-14`     | same system | 2 x 4, dt 10 (short smoke test) | 48 | none |
-| `h-flake-53`    | H + 52-atom C/H flake | 10 x 3, dt 10 | 48 | screen output only |
+| `h-flake-53`    | H + 52-atom C/H flake | 10 x 3, dt 10 (t = 0 to 100) | 48 | full output set + old screen log |
 | `h-flake-111`   | H + 110-atom C/H flake, `ipot=1` (linear p-fit QP) | 25 x 2, dt 3 | 12 | none |
 
 - **h-c4h9-14-ref**: this is the main regression test. `reference/` holds
@@ -64,8 +64,15 @@ To use one of them, edit `IN_dftb`.
   t = 100 block, because it is appended.
 - **h-c4h9-14**: uses the same geometry as above with a much shorter run
   (about 1 s on 4 ranks). Use it for a quick build check.
-- **h-flake-53**: `reference/stdout.log` is the saved screen output of an
-  earlier run (formerly `junk`). It contains no output files.
+- **h-flake-53**: `reference/` holds the full output set from a fresh run
+  on 48 MPI ranks (about 4 s) with the gfortran + OpenBLAS build.
+  `reference/stdout_old.log` (formerly `junk`) is the screen output of the
+  original run, also on 48 ranks, from a slightly older code version that
+  printed extra debug dumps. That log has no output files, so only the
+  t = 0 quantities can be compared with it. Those quantities agree: the
+  sampling, the norm and the kinetic energy are identical, and the DFTB
+  potential energy agrees to 2e-12 relative. Over the run, the total
+  energy in `ener` stays between 0.050685 and 0.050706.
 - **h-flake-111**: the largest system. This is the only example that uses a
   nonzero quantum potential (`ipot=1`).
 

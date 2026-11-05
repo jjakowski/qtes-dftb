@@ -94,7 +94,8 @@ example.
 | `h-c4h9-14-ref` | main regression test, fresh run from t = 0 to 100, full reference output |
 | `h-c4h9-14-restart` | restart test, t = 80 to 100 from a checkpoint; matches the fresh run |
 | `h-c4h9-14` | quick smoke test (about 1 s) |
-| `h-flake-53`, `h-flake-111` | larger systems, inputs only (53 has a saved screen log) |
+| `h-flake-53` | 53-atom system, full reference output (run on 48 ranks) |
+| `h-flake-111` | 111-atom system with nonzero quantum potential, inputs only |
 
 `examples/README.md` gives the details for each example. A quick check after a
 code change:
