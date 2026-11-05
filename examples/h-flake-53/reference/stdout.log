@@ -13,55 +13,56 @@
           52  CLASSICAL ATOMS: C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C C H H H H H H H H H H H H H H H 
  ATOM TYPE:            1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           1           2           2           2           2           2           2           2           2           2           2           2           2           2           2           2
  TIME STEPS, SUBSTEPS, dt:           10           3   3.3333333333333335     
+ PRINT OPTIONS nqtprt, nclprt (<=0: all):           20          20
  LEAVE MPI INPUT
  dftb_init_mpi, myid=            0
- dftb_init_mpi, myid=            2
  dftb_init_mpi, myid=            4
- dftb_init_mpi, myid=            3
- dftb_init_mpi, myid=            1
+ dftb_init_mpi, myid=           32
  dftb_init_mpi, myid=           33
  dftb_init_mpi, myid=           34
- dftb_init_mpi, myid=           18
  dftb_init_mpi, myid=           35
- dftb_init_mpi, myid=           19
- dftb_init_mpi, myid=           32
+ dftb_init_mpi, myid=           18
+ dftb_init_mpi, myid=           36
  dftb_init_mpi, myid=           17
- dftb_init_mpi, myid=            8
+ dftb_init_mpi, myid=           19
  dftb_init_mpi, myid=           16
  dftb_init_mpi, myid=           12
- dftb_init_mpi, myid=           21
- dftb_init_mpi, myid=           23
- dftb_init_mpi, myid=           22
- dftb_init_mpi, myid=           20
- dftb_init_mpi, myid=           11
- dftb_init_mpi, myid=           14
- dftb_init_mpi, myid=           13
+ dftb_init_mpi, myid=            8
+ dftb_init_mpi, myid=            1
+ dftb_init_mpi, myid=            2
+ dftb_init_mpi, myid=            3
  dftb_init_mpi, myid=           10
- dftb_init_mpi, myid=            9
- dftb_init_mpi, myid=           15
- dftb_init_mpi, myid=            6
- dftb_init_mpi, myid=            5
- dftb_init_mpi, myid=           38
+ dftb_init_mpi, myid=           44
  dftb_init_mpi, myid=           42
  dftb_init_mpi, myid=           37
- dftb_init_mpi, myid=            7
- dftb_init_mpi, myid=           40
- dftb_init_mpi, myid=           36
- dftb_init_mpi, myid=           41
- dftb_init_mpi, myid=           39
- dftb_init_mpi, myid=           46
- dftb_init_mpi, myid=           44
+ dftb_init_mpi, myid=            5
+ dftb_init_mpi, myid=           21
+ dftb_init_mpi, myid=           11
  dftb_init_mpi, myid=           43
- dftb_init_mpi, myid=           47
+ dftb_init_mpi, myid=           13
  dftb_init_mpi, myid=           45
+ dftb_init_mpi, myid=           40
+ dftb_init_mpi, myid=            6
+ dftb_init_mpi, myid=           14
+ dftb_init_mpi, myid=           38
+ dftb_init_mpi, myid=            9
+ dftb_init_mpi, myid=           22
+ dftb_init_mpi, myid=           46
+ dftb_init_mpi, myid=           41
+ dftb_init_mpi, myid=           23
+ dftb_init_mpi, myid=            7
+ dftb_init_mpi, myid=           20
+ dftb_init_mpi, myid=           39
+ dftb_init_mpi, myid=           15
+ dftb_init_mpi, myid=           47
+ dftb_init_mpi, myid=           29
+ dftb_init_mpi, myid=           27
+ dftb_init_mpi, myid=           31
+ dftb_init_mpi, myid=           26
  dftb_init_mpi, myid=           24
  dftb_init_mpi, myid=           25
- dftb_init_mpi, myid=           27
- dftb_init_mpi, myid=           26
- dftb_init_mpi, myid=           30
- dftb_init_mpi, myid=           31
- dftb_init_mpi, myid=           29
  dftb_init_mpi, myid=           28
+ dftb_init_mpi, myid=           30
            0 :  done with dftb_init
  INITIALIZE QTs           0          10          48          48
  INITITAL WAVEFUNCTION: sampling cutoff =    2.0000000000000000     
@@ -94,11 +95,8 @@
  PRINTING POSITIONS UP TO           40  DIMENSIONS
  SG: CLOSING FILES
  SG: CLOSED FILES
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
@@ -119,6 +117,33 @@ Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZER
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
@@ -141,7 +166,18 @@ Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZER
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
  MPI_FINALIZE ERR           0
@@ -150,42 +186,7 @@ Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZER
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0
  MPI_FINALIZE ERR           0

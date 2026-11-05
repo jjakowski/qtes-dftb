@@ -13,9 +13,10 @@
           13  CLASSICAL ATOMS: C C H H H C H H H C H H H 
  ATOM TYPE:            1           1           2           2           2           1           2           2           2           1           2           2           2
  TIME STEPS, SUBSTEPS, dt:            5          10   2.0000000000000000     
+ PRINT OPTIONS nqtprt, nclprt (<=0: all):           20          20
  LEAVE MPI INPUT
- dftb_init_mpi, myid=            3
  dftb_init_mpi, myid=            2
+ dftb_init_mpi, myid=            3
  dftb_init_mpi, myid=            1
  dftb_init_mpi, myid=            0
            0 :  done with dftb_init
@@ -45,11 +46,11 @@
  PRINTING POSITIONS UP TO           40  DIMENSIONS
  SG: CLOSING FILES
  SG: CLOSED FILES
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
+ MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
- MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
  MPI_FINALIZE ERR           0
 Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO
