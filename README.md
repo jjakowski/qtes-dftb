@@ -10,6 +10,15 @@ examples simulate one H atom scattering off a hydrocarbon (C/H) target.
 The code is Fortran 77/90 and uses MPI over trajectories, OpenMP, and
 BLAS/LAPACK.
 
+**User manual:** [`docs/MANUAL.md`](docs/MANUAL.md) (draft). It covers
+installation, the line-by-line input reference, run modes, running, output
+files, and troubleshooting.
+
+**Method:** S. Garashchuk, J. Jakowski, L. Wang, B. G. Sumpter,
+*J. Chem. Theory Comput.* **9**, 5221 (2013), doi:10.1021/ct4006147.
+**H on graphene:** L. Wang, J. Jakowski, S. Garashchuk,
+*J. Phys. Chem. C* **118**, 16175 (2014), doi:10.1021/jp503261k.
+
 ## Repository layout
 
 ```

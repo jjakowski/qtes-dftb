@@ -5,7 +5,26 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-No open issues (2026-11-05).
+### 8. Run hangs if an MPI rank gets no QTs
+
+- **Where:** the work split in `init_traj`, `trot` and `set_traj`.
+  Each rank takes a contiguous block of `nwork = ceil(np/ranks)` QTs and
+  then calls `mpi_gather`.
+- **Problem:** if `(ranks-1)*nwork >= np`, the last rank or ranks get no
+  QTs. The run then hangs at the first force gather in `init_traj`. All
+  ranks spin at 100 % CPU, and there is no error message.
+- **Seen:**
+  - `h-c4h9-14-ref` (48 QTs) on 13 ranks hangs; on 4, 5, 7 and 10 ranks
+    it runs, bit-identical to the reference.
+  - `h-flake-111` (12 QTs) on 5 ranks hangs; on 12 ranks it runs.
+  - Uneven splits are fine as long as every rank has at least one QT.
+- **Workaround:** choose the rank count so that every rank gets at least
+  one QT. The simplest choice is a divisor of `np`.
+- **Likely fix:** check at startup and stop with a clear message.
+  Alternatively, distribute the QTs so that no rank is left empty, and
+  pass the receive counts explicitly (`mpi_gatherv`). The exact point
+  where the gather blocks has not been traced yet.
+- **Found:** 2026-11-05
 
 ## Notes on behaviour (not bugs, but easy to miss)
 
