@@ -6,3 +6,8 @@
 qtes.x
 tests/runs/
 tmp.xyz
+docs/manual/*.pdf
+docs/manual/*.aux
+docs/manual/*.log
+docs/manual/*.out
+docs/manual/*.toc

@@ -1,0 +1,763 @@
+% qtes-dftb User Manual -- LaTeX version of docs/MANUAL.md
+% Build:  cd docs/manual && make     (or: pdflatex qtes-dftb-manual.tex, twice)
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}      % short tables: never split
+\usepackage{xltabular}     % long tables: may break across pages
+\usepackage{needspace}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+
+\setlist{nosep,leftmargin=*}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\renewcommand{\arraystretch}{1.25}
+\emergencystretch=3em   % long \texttt names: stretch spaces instead of overflowing
+
+% inline code: file names, variables, commands
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+% placeholder for content that needs the code authors
+\newcommand{\todo}[1][to be written]{\textbf{\textcolor{red!70!black}{[#1]}}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\definecolor{codebg}{gray}{0.95}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=none,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  aboveskip=0.8em,
+  belowskip=0.8em,
+  upquote=true,
+}
+\lstdefinestyle{bash}{language=bash,showstringspaces=false}
+
+\title{\textbf{qtes-dftb}\\[0.5em]
+  \Large User Manual\\[1em]
+  \large Quantum-trajectory dynamics with DFTB forces}
+\author{}
+\date{Draft, step 1 --- \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent This is a draft. Chapters marked \todo{} need input from the code
+authors, mainly the physics background. All other statements were checked
+against the source code and the example runs.
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\chapter{Introduction}
+
+\code{qtes-dftb} simulates the dynamics of a molecular system in which a
+few light nuclei (typically one H atom) are treated \textbf{quantum
+mechanically} and all other atoms \textbf{classically}. The quantum nuclei
+are represented by an ensemble of \textbf{quantum trajectories} (QTs) that
+sample their wavepacket. Their quantum effects enter through an approximate
+quantum potential, computed with the \textbf{linearized quantum force} (LQF)
+method. The forces on all atoms come from \textbf{DFTB} electronic-structure
+calculations done on the fly for every trajectory. The classical atoms move
+either in the trajectory-averaged (Ehrenfest) force or independently in
+each trajectory.
+
+The program is a parallel Fortran code (\code{bohmd}, version 17/08/2016).
+It distributes the trajectories over MPI ranks.
+
+\textbf{Typical application:} an H atom scattering from, or chemisorbed on,
+a hydrocarbon or a graphene flake. All included examples are of this type.
+
+\section*{Please cite}
+
+\begin{itemize}
+\item The method: S.~Garashchuk, J.~Jakowski, L.~Wang, B.~G.~Sumpter
+  \cite{garashchuk2013}.
+\item The H-on-graphene application: L.~Wang, J.~Jakowski, S.~Garashchuk
+  \cite{wang2014}.
+\end{itemize}
+
+Related: nonlinear quantum corrections \cite{wang2016}, which are not
+implemented in this code version.
+
+%======================================================================
+\chapter{Theory in brief}
+
+\todo{} Planned content, to be written with the code authors:
+\begin{itemize}
+\item the quantum-trajectory (Bohmian) formulation: QT positions, momenta,
+  action $s$ and weights $w$;
+\item the linearized quantum force (LQF) and the fit used in \code{qpot};
+\item the Ehrenfest treatment of the classical atoms;
+\item the initial wavepacket and its sampling;
+\item the definitions of the energies and of the correlation function
+  written to \code{ener} and \code{cor}.
+\end{itemize}
+These should follow the notation of ref.~\cite{garashchuk2013}.
+
+Facts already established from the code, to be built on:
+\begin{itemize}
+\item \textbf{Wavepacket:} the initial wavepacket of each quantum coordinate
+  is a Gaussian with width parameter $a_0$, centre $q_0$ and momentum $p_0$.
+  The sampling spread is
+  \begin{equation}
+    \sigma = \frac{1}{\sqrt{4 a_0}} .
+  \end{equation}
+\item \textbf{Quantum-force fit:} the basis is linear, $(x, y, z, 1)$ per
+  quantum atom. The fit solves the weighted moment matrix of the QT
+  positions.
+\item \textbf{Propagation:} velocity Verlet. Each large step $\Delta t$ is
+  split into \code{kout} substeps.
+\end{itemize}
+
+%======================================================================
+\chapter{Installation}
+
+\section{Requirements}
+
+\begin{tabularx}{\linewidth}{L{4.2cm} L{4.2cm} Y}
+\toprule
+Item & Tested with & Notes \\
+\midrule
+Fortran compiler + MPI wrapper \code{mpif90} & gfortran 15.2 + OpenMPI
+  (conda env \code{rmg-dev}) & Intel \code{ifort} + MKL also worked
+  historically (settings kept as comments) \\
+BLAS + LAPACK & OpenBLAS 0.3.30 & provides both; linked as
+  \code{-lopenblas} \\
+OpenMP & gfortran \code{-fopenmp} & \\
+\bottomrule
+\end{tabularx}
+
+On the development machine, everything comes from the \code{rmg-dev} conda
+environment. Activate it before you build \emph{and} before you run, because
+\code{qtes.x} loads OpenBLAS and the MPI libraries from that environment at
+run time.
+
+\section{Build}
+
+\begin{lstlisting}[style=bash]
+(cd dftb && make libdftb)   # 1. DFTB library  -> dftb/libdftb.a
+make                        # 2. main program  -> qtes.x
+\end{lstlisting}
+
+The top-level \code{make} does not build the library, so step~1 is required
+first, and again after any change in \code{dftb/}.
+
+\paragraph{Compiler flags.}
+\begin{itemize}
+\item \code{-O2 -fopenmp -fallow-argument-mismatch -std=legacy}, set in
+  \code{Makefile} (\code{switch}, \code{LIB}) and in
+  \code{dftb/GNUmake.inc} (\code{FOPT}).
+\item \code{-fallow-argument-mismatch} is required with gfortran 10 and
+  later. The legacy code passes arrays of different types and ranks to the
+  same routines, which newer gfortran rejects as errors unless this flag is
+  set. With it, they become warnings, and the many warnings during the
+  build are expected.
+\item To use Intel/MKL instead, restore the commented lines
+  \code{-mkl=sequential} and \code{-openmp} in both files.
+\end{itemize}
+
+\paragraph{Clean rebuild.}
+\begin{lstlisting}[style=bash]
+make allclean && (cd dftb && make clean && rm -f *.o libdftb.a)
+\end{lstlisting}
+\code{make allclean} also deletes \code{fort.*} and \code{*.log} in the top
+directory.
+
+\section{Debug build}
+
+To locate a floating-point error, build a separate copy with:
+\begin{lstlisting}
+-O0 -g -fbacktrace -ffpe-trap=zero,invalid
+-fallow-argument-mismatch -std=legacy -fopenmp
+\end{lstlisting}
+The program then stops at the first division by zero or invalid operation
+and prints a backtrace with file and line numbers.
+
+%======================================================================
+\chapter{Quick start}
+
+\begin{lstlisting}[style=bash]
+conda activate rmg-dev                     # environment with mpif90/OpenBLAS
+(cd dftb && make libdftb) && make          # build
+tests/run_example.sh h-c4h9-14 4           # ~1 s smoke test on 4 MPI ranks
+tests/run_example.sh h-c4h9-14-ref 4       # main regression test
+R=$(ls -d tests/runs/h-c4h9-14-ref_* | tail -1)
+diff -q $R/ener examples/h-c4h9-14-ref/reference/ener && echo "matches reference"
+\end{lstlisting}
+
+\code{tests/run_example.sh <example> [ranks]} does the following:
+\begin{itemize}
+\item creates a fresh directory \code{tests/runs/<example>_<timestamp>/};
+\item copies in the example's inputs, the Slater--Koster files, any restart
+  checkpoint, and \code{qtes.x};
+\item sets \code{OMP_NUM_THREADS=1} (unless already set) and
+  \code{OPENBLAS_NUM_THREADS=1}, and raises the stack limit;
+\item runs \code{mpirun -np <ranks> ./qtes.x > stdout.log}.
+\end{itemize}
+
+\textbf{Never run \code{qtes.x} inside \code{examples/}.} The program writes
+its output into the current directory and would overwrite the reference
+data.
+
+%======================================================================
+\chapter{Input reference}
+\label{ch:input}
+
+The program takes \textbf{no command-line arguments}. It reads these files
+from the current directory, under these exact names:
+
+\begin{tabularx}{\linewidth}{L{3.4cm} Y L{4.6cm}}
+\toprule
+File & Content & Read by \\
+\midrule
+\code{INdyn} & dynamics settings + one line per atom (wavepacket,
+  displacement, momentum, mass) & \code{read_input_mpi.f} \\
+\code{INxyz} & model and analysis parameters + reference geometry &
+  \code{read_input_mpi.f} \\
+\code{IN_dftb} & DFTB atom types and Slater--Koster file names &
+  \code{dftb/dftb_init_mpi.f} \\
+\code{*.spl} & Slater--Koster parameter tables & DFTB library \\
+\code{traj.sav} (+ old outputs) & only for a restart &
+  \code{read_input_mpi.f}, \code{set_traj.f} \\
+\bottomrule
+\end{tabularx}
+
+All files are read with Fortran list-directed input. Values are separated by
+spaces, and text after the last value on a line, such as the
+\texttt{\textbackslash comment} used in the examples, is ignored. Lines 1--9 of \code{INdyn}
+must each hold exactly the values listed below, except where values are
+marked optional.
+
+\section{\texttt{INdyn}}
+\label{sec:indyn}
+
+\needspace{8\baselineskip}
+\begin{xltabular}{\linewidth}{c L{3.0cm} Y L{3.4cm}}
+\toprule
+Line & Values & Meaning & Units, notes \\
+\midrule
+\endhead
+1 & \code{nat} & total number of atoms & must equal the number of geometry
+  lines in \code{INxyz} \\
+2 & \code{nq} & number of \textbf{quantum} atoms; they must be listed
+  \textbf{first} & examples: 1 (the H) \\
+3 & \code{kmax} & number of large time steps & on restart, reduced
+  automatically by the time already done \\
+4 & \code{kout} & substeps per large step & \\
+5 & \code{dt} & large time step & a.u.\ of time; the integration step is
+  \code{dt/kout} \\
+6 & \code{ipot isr} & \code{ipot}: quantum potential (0 off, 1 3-D LQF,
+  2 LQF along $z$). \code{isr}: initial sampling (0 off, 1 Gaussian) &
+  \code{ipot > 0} requires \code{isr = 1} (ch.~\ref{ch:modes}) \\
+7 & \code{pow} & sampling cutoff: keep a sampled point if its Gaussian
+  weight exceeds $10^{-\mathtt{pow}}$ & used only with \code{isr = 1} \\
+8 & \code{ipf} & 0 = Ehrenfest (averaged classical forces); any other value
+  = independent classical copies & ch.~\ref{ch:modes} \\
+9 & \code{np ist [nqtprt [nclprt]]} & \code{np}: number of QTs.
+  \code{ist}: 0 = fresh start, 1 = restart from \code{traj.sav}. Optional
+  print counts, default 20 each, $\le 0$ = all &
+  sec.~\ref{sec:restart}, ch.~\ref{ch:output} \\
+10+ & one line per atom & in the same order as \code{INxyz} (blank lines
+  are skipped) & see below \\
+\bottomrule
+\end{xltabular}
+
+\paragraph{Atom lines.}
+\begin{lstlisting}
+quantum atom:    sym  a0   x0 y0 z0   px py pz   m
+classical atom:  sym  (ignored)  x0 y0 z0   (px py pz ignored)   m
+\end{lstlisting}
+
+\begin{tabularx}{\linewidth}{L{2.0cm} L{5.0cm} Y}
+\toprule
+Field & Meaning & Units, notes \\
+\midrule
+\code{sym} & element symbol (informational) & \\
+\code{a0} & width parameter of the initial Gaussian, the same for $x$, $y$,
+  $z$ & bohr$^{-2}$; sampling spread $\sigma = 1/\sqrt{4 a_0}$ \\
+\code{x0 y0 z0} & displacement added to the \code{INxyz} position & bohr \\
+\code{px py pz} & initial momentum of the wavepacket centre & a.u. Read for
+  every atom, but \textbf{used only for quantum atoms}; classical atoms
+  always start at rest \\
+\code{m} & mass & electron masses (H = 1836, C = 22032). The
+  \code{h-c4h9-14*} examples use masses $\times 10^8$ for the classical
+  atoms, which effectively freezes the target \\
+\bottomrule
+\end{tabularx}
+
+\needspace{12\baselineskip}
+\section{\texttt{INxyz}}
+
+\needspace{8\baselineskip}
+\begin{xltabular}{\linewidth}{c L{2.2cm} L{2.2cm} Y}
+\toprule
+Line & Values & Used in DFTB runs? & Meaning \\
+\midrule
+\endhead
+1 & \code{ql qls} & no & lattice constant and interaction cutoff of the old
+  analytic model potentials (\code{derivs0/1/3}) \\
+2 & \code{dw sc} & no & force constant and coupling (\code{sc} is
+  multiplied by \code{dw}) of the model potentials \\
+3 & \code{dch zh ch} & \textbf{\code{ch} only} & \code{dch}, \code{zh}:
+  model-potential parameters. \code{ch}: reference $z$ (bohr) used for the
+  bonding probability in \code{aver} (sec.~\ref{sec:bonding}) \\
+4 & \code{esh} & \textbf{yes} & energy shift subtracted from every DFTB
+  energy, $V = E_\mathrm{DFTB} - \mathtt{esh}$ (hartree) \\
+5 & \code{bnd} & \textbf{yes} & threshold for the bonding probability in
+  \code{aver} (bohr) \\
+6 & \code{qmn qmx} & \textbf{yes} & $z$-window for the quantum atom (bohr),
+  ch.~\ref{ch:modes} \\
+7+ & \code{sym x y z itype} & yes & reference geometry, one line per atom,
+  \textbf{in \AA ngstr\"om} (converted to bohr on input with
+  0.52918~\AA/bohr). \code{itype} is the DFTB atom type, an index into
+  \code{IN_dftb}. Blank lines before the geometry are allowed; lines after
+  the first \code{nat} atoms are ignored \\
+\bottomrule
+\end{xltabular}
+
+The program builds the actual starting positions from the \code{INxyz}
+geometry plus the \code{INdyn} displacements. Make sure no two atoms end up
+on top of each other: DFTB then fails at the first step with
+\code{ewevge: ier = ...}. See \code{KNOWN_ISSUES.md} F2 and
+ch.~\ref{ch:trouble}.
+
+\section{\texttt{IN\_dftb}}
+
+\begin{lstlisting}
+2                ! ntype: number of atom types
+2 1              ! lmax per type: number of angular shells (1 = s, 2 = s+p); type 1 = C, type 2 = H
+'cc.spl'         ! SK files for every ordered pair (1,1), (1,2), (2,1), (2,2)
+'ch-g2ms.spl'
+'hc-g2ms.spl'
+'hh.spl'
+\end{lstlisting}
+
+\begin{itemize}
+\item \textbf{Slater--Koster files:} \code{examples/sk/} contains
+  \code{cc.spl}, \code{hh.spl} and three C--H parameterizations:
+  \code{ch/hc-g2ms.spl} (used by all examples), \code{ch/hc-b3.spl}, and
+  \code{ch/hc.spl}.
+\item \textbf{Hard-coded DFTB settings} in \code{derivs} (\code{qtes.f}):
+  \begin{itemize}
+  \item electronic temperature \code{telec} = 6000~K (Mermin free energy);
+  \item neutral system (\code{qnel = 0});
+  \item SCC tolerance $10^{-6}$;
+  \item \code{ntype = 2}.
+  \end{itemize}
+  Systems with more than two element types therefore need a code change.
+\end{itemize}
+
+\section{Restart files}
+\label{sec:restart}
+
+With \code{ist = 1} on line 9:
+\begin{itemize}
+\item \code{traj.sav} supplies the time and all QT positions, momenta,
+  actions and weights.
+\item The output files \code{traj aver qt.dat pfit qtx qty qtz ener clx cly
+  clz wft cor} must already exist. They are opened with
+  \code{status='old'} and appended to.
+\item Keep all other inputs, including the print options, the same as in
+  the original run. See example \code{h-c4h9-14-restart}.
+\end{itemize}
+
+%======================================================================
+\chapter{Run modes}
+\label{ch:modes}
+
+This chapter is a summary. \code{docs/DYNAMICS.md} describes each switch in
+detail, with the code locations.
+
+\needspace{8\baselineskip}
+\begin{xltabular}{\linewidth}{L{2.8cm} L{2.4cm} Y L{3.6cm}}
+\toprule
+Mode & Switch & Typical use & Requirements \\
+\midrule
+\endhead
+Ehrenfest & \code{ipf = 0} & classical target responds to the averaged
+  quantum atom & default in all examples \\
+Independent classical copies & \code{ipf} $\neq 0$ & each QT carries its
+  own target & only differs from Ehrenfest when \code{isr = 1} \\
+No quantum potential & \code{ipot = 0} & quantum atom moves classically
+  (ensemble of classical trajectories) & --- \\
+3-D LQF & \code{ipot = 1} & quantum effects (zero-point energy, spreading)
+  in $x$, $y$, $z$ & \code{isr = 1} and enough QTs ($\ge 4$ with $w > 0$,
+  in practice many more) \\
+LQF along $z$ & \code{ipot = 2} & quantum effects along the surface normal
+  only & \code{isr = 1} \\
+Sampling & \code{isr = 1}, \code{pow} & wavepacket represented by randomly
+  sampled QTs & --- \\
+$z$-window & \code{qmn}, \code{qmx} & below \code{qmn}: QT removed from the
+  ensemble; above \code{qmx}: DFTB skipped (free flight) & choose
+  \code{qmx} where the potential is flat \\
+Restart & \code{ist = 1} & continue a run from \code{traj.sav} &
+  sec.~\ref{sec:restart} \\
+Print options & \code{nqtprt}, \code{nclprt} & width of
+  \code{qtx..clz} & ch.~\ref{ch:output} \\
+\bottomrule
+\end{xltabular}
+
+\todo{} Physical guidance on choosing modes and parameters, for example how
+many QTs, $a_0$, \code{dt}, and \code{qmn}/\code{qmx}, with the code
+authors.
+
+%======================================================================
+\chapter{Running}
+\label{ch:running}
+
+\begin{lstlisting}[style=bash]
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+ulimit -s unlimited                  # large local arrays live on the stack
+mpirun -np <ranks> ./qtes.x > stdout.log 2>&1
+\end{lstlisting}
+
+\paragraph{Parallelization.}
+\begin{itemize}
+\item Every rank holds a full copy of all QTs.
+\item The DFTB calculations are split into contiguous blocks of
+  $\lceil n_p / n_\mathrm{ranks} \rceil$ QTs per rank.
+\item The forces are gathered and broadcast after every substep.
+\item \textbf{Rank count rule: every rank must get at least one QT}, i.e.
+  \begin{equation}
+    (n_\mathrm{ranks} - 1)\,\lceil n_p / n_\mathrm{ranks} \rceil < n_p .
+  \end{equation}
+  Otherwise the run \textbf{hangs} at the start, with no error message
+  (\code{KNOWN_ISSUES.md} \#8).
+\item Uneven splits are fine. For example, 48 QTs run on 4, 5, 7 or 10
+  ranks with bit-identical results, but hang on 13 ranks.
+\item The safest choice is a divisor of $n_p$. Results do not depend on the
+  rank count.
+\end{itemize}
+
+\paragraph{Threads.} Keep \code{OPENBLAS_NUM_THREADS=1}. This matches the
+original \code{-mkl=sequential} and avoids oversubscribing cores with MPI
+ranks $\times$ BLAS threads.
+
+\paragraph{Stack.} \code{ulimit -s unlimited} is needed. With
+\code{-fopenmp}, large local arrays (about 28~MB in \code{trot}) are
+allocated on the stack.
+
+\paragraph{Cluster.} An old SLURM example is in \code{docs/sbatch.script}
+(24 tasks per node, \code{OMP_NUM_THREADS=1}).
+
+\paragraph{Measured run times} (gfortran + OpenBLAS, development machine):
+
+\begin{tabularx}{\linewidth}{Y r r r r r}
+\toprule
+Example & Atoms & QTs & Substeps & Ranks & Wall time \\
+\midrule
+\code{h-c4h9-14} & 14 & 48 & 8 & 4 & $\sim$1 s \\
+\code{h-c4h9-14-ref} & 14 & 48 & 50 & 4 & $\sim$3 s \\
+\code{h-flake-53} & 53 & 48 & 30 & 48 & $\sim$4 s \\
+\code{h-flake-111} & 111 & 12 & 50 & 12 & $\sim$25 s \\
+\bottomrule
+\end{tabularx}
+
+%======================================================================
+\chapter{Output reference}
+\label{ch:output}
+
+All output files are written by MPI rank 0 into the current directory.
+\begin{itemize}
+\item \textbf{Units:} time in a.u., positions in bohr, energies in hartree.
+\item \textbf{Columns:} in all files except \code{wf0}, \code{wft},
+  \code{qt.dat} and \code{traj.sav}, column 1 is the time.
+\item \textbf{When written:}
+  \begin{itemize}
+  \item per substep: \code{ener}, \code{cor};
+  \item per large step: \code{aver}, \code{traj}, \code{qtx..clz},
+    \code{pfit}, plus $t = 0$ for most of them;
+  \item \code{qt.dat}: per large step, without $t = 0$;
+  \item \code{traj.sav}: overwritten at every large step.
+  \end{itemize}
+\end{itemize}
+
+\section{Files}
+
+\needspace{8\baselineskip}
+\begin{xltabular}{\linewidth}{L{3.0cm} Y}
+\toprule
+File & Content and columns \\
+\midrule
+\endhead
+\code{ener} & $t$, $E_\mathrm{total}$, $\langle Q\rangle$, $\langle
+  V\rangle$, $\langle K_\mathrm{quantum}\rangle$, $\langle
+  K_\mathrm{classical}\rangle$: weighted averages over the QTs; $V$
+  includes the \code{esh} shift. Energy conservation of $E_\mathrm{total}$
+  is the main health check \\
+\code{cor} & $2t$, $\mathrm{Re}\,C$, $\mathrm{Im}\,C$: correlation function
+  $C = \sum_i w_i e^{2 i s_i} / \sum_i w_i$ (an autocorrelation if
+  $\psi(0)$ is real) \\
+\code{aver} & $t$, norm, $P$, $\langle x_1\rangle \ldots \langle
+  x_{40}\rangle$: norm $= \sum_i w_i$ (drops below 1 when QTs leave below
+  \code{qmn}); $P$ = bonding probability (sec.~\ref{sec:bonding});
+  weighted average of the first 40 coordinates \\
+\code{traj} & $t$, the first $4\,n_{qd}$ coordinates of QT 2, and $s_2$: a
+  representative trajectory \\
+\code{qtx qty qtz} & $t$, then $x$/$y$/$z$ of the quantum atom in QT 1
+  \ldots\ $\min(n_p, \mathtt{nqtprt})$ \\
+\code{clx cly clz} & \code{ipf = 0}: $t$, then $x$/$y$/$z$ of classical
+  atoms 1 \ldots\ $\min(n_\mathrm{cl}, \mathtt{nclprt})$ from the first QT
+  with $w > 0$. \code{ipf} $\neq 0$: the first classical atom in QT 1
+  \ldots\ $\min(n_p, \mathtt{nqtprt})$ \\
+\code{pfit} & $t$ and the LQF fit coefficients (\code{ipot > 0}; empty
+  otherwise) \\
+\code{qt.dat} & 2 lines per QT per large step: all positions + $w$, then
+  all momenta + $s$ (full precision) \\
+\code{traj.sav} & restart checkpoint: time, then the same 2 lines per QT \\
+\code{wf0}, \code{wft} & initial and final positions of every QT (first 40
+  coordinates). On restart, \code{wf0} holds the restart state and
+  \code{wft} is appended to \\
+\code{trajt}, \code{dftbt} & timings: start, end, elapsed. They differ on
+  every run \\
+\code{out.dftb} & echo of the DFTB setup read from \code{IN_dftb} \\
+\code{stdout.log} & screen output: setup summary, including
+  \code{PRINT OPTIONS}, initial energies, step counter \\
+\code{fort.1000+rank} & per-rank trace written at initialization \\
+\bottomrule
+\end{xltabular}
+
+\code{docs/sg-notes-files} gives the column formats in the original
+notation.
+
+\section{Bonding probability \texorpdfstring{$P$}{P} (column 3 of
+\texttt{aver})}
+\label{sec:bonding}
+
+\begin{equation}
+  P = \frac{\sum_i w_i\, \Theta\!\left(|z_{\mathrm{H},i} - \mathtt{ch}|
+      - \mathtt{bnd}\right)}{\sum_i w_i},
+\end{equation}
+where $\Theta$ is the step function ($\Theta(x) = 1$ for $x \ge 0$),
+$z_{\mathrm{H},i}$ is the \textbf{absolute $z$ coordinate} of the quantum
+atom in QT $i$, and \code{ch}, \code{bnd} come from \code{INxyz}.
+
+With the values in the current examples (\code{ch} = 0.65 bohr, \code{bnd}
+= 1 bohr), the H is always more than \code{bnd} away from $z = \mathtt{ch}$,
+so $P = 1$ throughout. \todo[to be clarified with the authors] What $P$ is
+meant to measure. A commented-out older line used the H--C distance instead
+of the absolute $z$.
+
+%======================================================================
+\chapter{Examples}
+
+All examples are in \code{examples/}. \code{examples/README.md} describes
+each one in detail, including how its reference data was made.
+
+\begin{tabularx}{\linewidth}{L{3.6cm} Y L{3.6cm}}
+\toprule
+Example & System & Purpose \\
+\midrule
+\code{h-c4h9-14-ref} & H + C$_4$H$_9$ (frozen), 48 QTs & main regression
+  test \\
+\code{h-c4h9-14-restart} & same, restart from $t = 80$ & tests the restart
+  path \\
+\code{h-c4h9-14} & same, short & $\sim$1 s smoke test \\
+\code{h-flake-53} & H + 52-atom graphene flake & larger system, Ehrenfest
+  target \\
+\code{h-flake-53-print} & same, \code{nqtprt = 48}, \code{nclprt = 0} &
+  demonstrates the print options \\
+\code{h-flake-111} & H chemisorbed on a 110-atom flake, \code{ipot = 1},
+  \code{isr = 1} & quantum potential with sampling \\
+\bottomrule
+\end{tabularx}
+
+The graphene-flake examples correspond to the system studied in
+ref.~\cite{wang2014}.
+
+\todo{} Step-by-step tutorials with plots.
+
+%======================================================================
+\chapter{Verification and regression tests}
+
+\begin{itemize}
+\item \textbf{Reproducibility:} runs are bit-reproducible, and the results
+  are the same for any valid rank count. This was tested with 4, 5, 7 and
+  10 ranks on \code{h-c4h9-14-ref}. Every example has a \code{reference/}
+  folder.
+\item \textbf{After a code change:} run all examples. Every file except
+  \code{trajt}/\code{dftbt} must be byte-identical to the reference, unless
+  the change is meant to alter results.
+\end{itemize}
+
+\begin{lstlisting}[style=bash]
+for ex in "h-c4h9-14-ref 4" "h-c4h9-14-restart 4" "h-flake-53 48" \
+          "h-flake-53-print 48" "h-flake-111 12"; do
+  set -- $ex; tests/run_example.sh $1 $2 >/dev/null
+  R=$(ls -d tests/runs/$1_2* | tail -1)
+  for f in ener cor aver qt.dat traj.sav qtx clx; do
+    cmp -s $R/$f examples/$1/reference/$f || echo "$1: $f differs"
+  done
+done
+\end{lstlisting}
+
+\paragraph{Physics checks.}
+\begin{itemize}
+\item $E_\mathrm{total}$ in \code{ener} should be conserved, to all printed
+  digits in the examples.
+\item A restart from $t = 80$ reproduces a single run from 0 to 100 to
+  round-off.
+\item With per-rank checksums, all ranks stay bit-identical (see
+  \code{KNOWN_ISSUES.md} F7).
+\end{itemize}
+
+%======================================================================
+\chapter{Troubleshooting}
+\label{ch:trouble}
+
+\needspace{8\baselineskip}
+\begin{xltabular}{\linewidth}{L{4.4cm} Y L{3.8cm}}
+\toprule
+Message or symptom & Cause & Fix \\
+\midrule
+\endhead
+\code{Bad integer for item 2 in list input} at \code{read_input_mpi.f} &
+  a line of \code{INdyn} has too few values, e.g.\ line 6 needs
+  \code{ipot isr} & give all required values (sec.~\ref{sec:indyn}) \\
+\code{ewevge: ier = ...} in \code{fort.10x}, run stops before $t = 0$ &
+  DFTB failed, usually because two atoms overlap after the \code{INdyn}
+  displacements & check the starting distances (\code{INxyz} +
+  displacements) \\
+\code{QPOT ERROR ... only N QTs with w>0; fit needs M} & too few QTs left
+  inside the \code{qmn} window for the quantum-force fit & more QTs, a
+  lower \code{qmn}, or \code{ipot = 0} \\
+\code{QPOT ERROR ... DPOSV FAILED ... (isr=0?)} & the fit matrix is
+  singular: all QTs identical (\code{isr = 0}) or lying in a plane & use
+  \code{isr = 1} with \code{ipot > 0} \\
+energies grow quickly before a \code{QPOT ERROR} & the fit is
+  ill-conditioned with few, clustered QTs & more QTs; keep them inside the
+  window \\
+restart stops opening a file & restart needs the previous output files &
+  copy them into the run directory (sec.~\ref{sec:restart}) \\
+\code{IEEE_DENORMAL} note at exit & harmless: products of near-zero
+  coordinates & none \\
+\code{MPI_FINALIZE ERR 0} (one per rank) & the return code of
+  \code{MPI_Finalize}; 0 means success & none \\
+step in $E_\mathrm{total}$ when a QT re-enters below \code{qmx} & free
+  flight with a frozen potential above \code{qmx} & raise \code{qmx} to
+  where the potential is flat \\
+run hangs right after \code{FINISHED SAMPLING}, all ranks at 100\,\% CPU &
+  some MPI rank has no QTs (\code{KNOWN_ISSUES.md} \#8) & use a rank count
+  with every rank getting $\ge 1$ QT, e.g.\ a divisor of $n_p$ \\
+run hangs or crashes at start with a large system & stack too small &
+  \code{ulimit -s unlimited} \\
+\bottomrule
+\end{xltabular}
+
+Open and fixed bugs are tracked in \code{docs/KNOWN_ISSUES.md}.
+
+%======================================================================
+\chapter{Developer notes}
+
+\todo{} Planned content:
+\begin{itemize}
+\item the source layout (\code{qtes.f} subroutines \code{init_traj},
+  \code{trot}, \code{qpot}, \code{over}, \code{aver}, \code{derivs};
+  \code{read_input_mpi.f}; \code{set_traj.f}; \code{dftb/});
+\item the replicated-data MPI design and its rules (all ranks must make
+  identical decisions; see F7);
+\item the fixed-form Fortran 72-column limit;
+\item where to add a new potential (\code{derivs0..3}) or an output;
+\item the test procedure before committing.
+\end{itemize}
+
+%======================================================================
+\appendix
+
+\chapter{Units}
+
+\begin{tabularx}{\linewidth}{L{2.6cm} L{3.6cm} Y}
+\toprule
+Quantity & Unit & Conversion \\
+\midrule
+length & bohr ($a_0$) & 1 bohr = 0.52918~\AA\ (value used in the code) \\
+time & a.u. & 1 a.u.\ = 0.024189 fs \\
+energy & hartree ($E_h$) & 1 $E_h$ = 27.211 eV \\
+mass & electron mass ($m_e$) & H = 1836, C = 22032 ($12 \times 1836$) \\
+momentum & a.u. & $\hbar/a_0$ \\
+\bottomrule
+\end{tabularx}
+
+\chapter{Glossary}
+
+\begin{tabularx}{\linewidth}{L{3.0cm} Y}
+\toprule
+Term & Meaning \\
+\midrule
+QT & quantum trajectory: one member of the ensemble that samples the
+  quantum nuclei \\
+QDOF / \code{nqd} & quantum degrees of freedom: 3 $\times$ number of
+  quantum atoms \\
+LQF & linearized quantum force: the quantum potential from a linear fit
+  over the QTs \\
+Ehrenfest & the classical atoms move in the QT-averaged force
+  (\code{ipf = 0}) \\
+$w$, $s$ & weight and action (phase) of a QT \\
+$z$-window & \code{qmn}/\code{qmx}: the $z$-range of the quantum atom inside
+  which DFTB is computed \\
+\bottomrule
+\end{tabularx}
+
+\chapter{Compile-time limits}
+
+\begin{tabularx}{\linewidth}{L{2.0cm} L{3.4cm} r Y}
+\toprule
+Parameter & File & Value & Limits \\
+\midrule
+\code{ndx} & \code{bohm.inc} & 700 & total coordinates, i.e.\ at most 233
+  atoms \\
+\code{npx} & \code{bohm.inc} & 5000 & QTs \\
+\code{nqx} & \code{bohm.inc} & 200 & quantum coordinates \\
+\code{nndim} & \code{dftb/maxima.inc} & 800 & atoms in DFTB \\
+\code{mdim} & \code{dftb/maxima.inc} & 3200 & DFTB orbitals \\
+\code{maxtyp} & \code{dftb/maxima.inc} & 6 & DFTB atom types
+  (\code{derivs} currently passes 2) \\
+\bottomrule
+\end{tabularx}
+
+After changing a limit, do a clean rebuild of both \code{dftb/} and the
+main program.
+
+%======================================================================
+\begin{thebibliography}{9}
+
+\bibitem{garashchuk2013}
+S.~Garashchuk, J.~Jakowski, L.~Wang, B.~G.~Sumpter,
+``Quantum Trajectory--Electronic Structure Approach for Exploring Nuclear
+Effects in the Dynamics of Nanomaterials'',
+\emph{J. Chem. Theory Comput.} \textbf{9}, 5221--5235 (2013).
+\href{https://doi.org/10.1021/ct4006147}{doi:10.1021/ct4006147}
+
+\bibitem{wang2014}
+L.~Wang, J.~Jakowski, S.~Garashchuk,
+``Adsorption of a Hydrogen Atom on a Graphene Flake Examined with Quantum
+Trajectory/Electronic Structure Dynamics'',
+\emph{J. Phys. Chem. C} \textbf{118}, 16175--16187 (2014).
+\href{https://doi.org/10.1021/jp503261k}{doi:10.1021/jp503261k}
+
+\bibitem{wang2016}
+L.~Wang, J.~Jakowski, S.~Garashchuk, B.~G.~Sumpter,
+\emph{J. Chem. Theory Comput.} \textbf{12}, 4487--4500 (2016).
+\href{https://doi.org/10.1021/acs.jctc.6b00126}{doi:10.1021/acs.jctc.6b00126}
+
+\end{thebibliography}
+
+\end{document}
