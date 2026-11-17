@@ -5,19 +5,40 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 9. Restart with too few QTs in `traj.sav` does not stop cleanly
+### 10. Sampling: a rejected point replaces the last accepted one
 
-- **Where:** `set_traj.f`, after reading `traj.sav` on rank 0.
-- **Problem:** if `traj.sav` holds fewer QTs than `np` in `INdyn`, the
-  code prints `NOT ENOUGH TRAJ DATA PROVIDED` and calls `mpi_abort()`
-  without its arguments (communicator, error code, ierr), on rank 0
-  only. The call is invalid, so the run may crash or hang instead of
-  stopping cleanly. The other ranks continue to the force calculation.
-- **Workaround:** keep `np` in `INdyn` equal to the number of QTs in
-  `traj.sav`.
-- **Likely fix:** `call mpi_abort(MPI_COMM_WORLD,1,ierr)`. Not tested
-  yet.
-- **Found:** 2026-11-17, while fixing #8 (F9).
+- **Where:** `qtes.f`, `subroutine init_traj`, sampling loop
+  `do 101 i=1,np*50` (used with `isr = 1`).
+- **Problem:** the cutoff test only decides whether the counter `ic` is
+  increased. The point is then stored in slot `ic` in either case:
+  ```
+  if(ww.gt.10**(-pow)) then
+   ic=ic+1
+  endif
+  ...
+  x(k,ic)=q(k)      ! also done for a rejected point
+  ```
+  So a rejected point overwrites the last accepted point, and that
+  slot keeps the rejected point unless another rejected point follows.
+  If the very first point is rejected, it is written to slot 0, outside
+  the arrays.
+- **Effect:** the `pow` cutoff does not remove points as intended. For
+  each rejected point (or run of them), one accepted point is lost and
+  one point from outside the cutoff is kept. The number of QTs is not
+  affected.
+  - For one 3-D quantum atom, the rejection rate is about 2.7 % at
+    `pow = 2` and 0.04 % at `pow = 4`. So with 1000 QTs at `pow = 2`,
+    about 27 tail points replace accepted ones.
+  - Only `h-flake-111` uses `isr = 1` (12 QTs, `pow = 4`), where a
+    rejection is unlikely.
+- **Also noted:** the momentum-sampling branch inside this loop
+  (`if(k.eq.(nqd+1))`) can never be true, because `k` runs from 1 to
+  `nqd`. So momenta are never sampled, as the manual already states.
+- **Likely fix:** store the point only when it is accepted. This would
+  change the sampled QTs of runs with rejections, so it changes
+  results; it needs a decision.
+- **Found:** 2026-11-17, while checking how `np` can shrink during
+  sampling (#9, now F10).
 
 ## Notes on behaviour (not bugs, but easy to miss)
 
@@ -318,3 +339,51 @@ of the run modes (`ipf`, `ipot`, `isr`, `qmn`/`qmx`, restart).
     timing files): `h-c4h9-14-ref` on 4, 5 and 7 ranks,
     `h-c4h9-14-restart` on 4, `h-flake-53` and `h-flake-53-print` on
     48, `h-flake-111` on 12.
+
+### F10. Restart with a `traj.sav` that does not fit was not detected correctly (was open issue #9)
+
+- **Where:** the `traj.sav` reading loop, present twice with the same
+  code in `read_input_mpi.f` and `set_traj.f` (rank 0).
+- **Problem:** `traj.sav` held only the time and two lines per QT, not
+  the number of QTs; a restart read `np` QTs, with `np` from `INdyn`.
+  - Off by one: the counter was increased before each read, so a file
+    exactly one QT short passed the check. The missing QT was run with
+    all coordinates zero, DFTB failed (`ewevge: ier = 58`) and the run
+    died with only an MPI report.
+  - Invalid abort: two or more QTs short printed
+    `NOT ENOUGH TRAJ DATA PROVIDED`, then `mpi_abort()` without arguments
+    crashed rank 0 with `SIGSEGV` (exit code 139).
+  - A file with more QTs than `np` was used silently.
+  - Causes: `np` changed in `INdyn` between the runs, a file cut short
+    (job killed while writing it, disk full), or a file from another run.
+- **Fix** (2026-11-17):
+  - `traj.sav` now starts with a header line
+    `# np nd dt kout   np nd dt kout (qtes traj.sav header)`, written in
+    the main program (`dt` is the large step of `INdyn` line 5).
+  - One shared reader, `subroutine rdsav` in `set_traj.f`, replaces both
+    loops. It checks the header values against the inputs and reports
+    every one that changed (`RESTART ERROR: np changed between runs:
+    traj.sav 48, INdyn line 9 50`, plus the value to set). It then
+    requires exactly `np` complete QTs: too few, too many, or a file that
+    ends inside a QT each give their own message. A missing or empty
+    file is reported too. Errors stop all ranks with a valid
+    `mpi_abort` (`subroutine savfail`), before any output file is
+    appended to.
+  - Old files without the header are still accepted (only the QT count
+    is checked, with a hint that `np` may have changed). Older
+    executables cannot read the new header; deleting the header line
+    makes a file readable for them again.
+- **Verification** (all in `tests/runs/`, on `h-c4h9-14-restart`):
+  - Restart from its old-format checkpoint, and from the same checkpoint
+    with a header added: all output files byte-identical to the
+    reference.
+  - Error cases, each stopping with exit code 1 and the right message:
+    `np` = 49, 50 and 47 with the old file (48 QTs); last line removed;
+    last line cut in half; header with `np` = 50 in `INdyn`; header with
+    `nd`, `dt` and `kout` all different (three messages); header fine
+    but the last QT missing; `traj.sav` missing; `traj.sav` empty.
+  - Regression: all examples byte-identical to their references except
+    `traj.sav`, which differs only by the new header line. The reference
+    `traj.sav` files were replaced. The restart example keeps its
+    old-format checkpoint in `restart/`, so the regression test also
+    covers the old format.

@@ -93,7 +93,9 @@ environment that provided `mpif90`.
 
 To restart a run, set the restart flag in `INdyn` (line 9, `<nQT> 1`). The
 code then reads the time and all trajectories from `traj.sav` and runs the
-remaining `kmax - t/dt` large steps. It appends results to `traj`, `aver`,
+remaining `kmax - t/dt` large steps. The header line of `traj.sav`
+(`# np nd dt kout`) is checked against the inputs, and the run stops with
+`RESTART ERROR` if the file does not fit (for example, `np` changed). It appends results to `traj`, `aver`,
 `ener`, `cor`, `qt.dat`, `qtx`...`clz`, `pfit`, and `wft`, so those files
 must already exist in the run directory. See the `h-c4h9-14-restart`
 example.

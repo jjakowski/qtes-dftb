@@ -64,7 +64,10 @@ To use one of them, edit `IN_dftb`.
   the restart job itself writes (t > 80) were checked against the single
   fresh 0 to 100 run in `h-c4h9-14-ref/reference/`. `ener` and `cor` are
   bit-identical, and the final state in `traj.sav` agrees to 1e-13 or
-  better. Two files differ by design. `wf0` is the t = 80 restart state,
+  better. The checkpoint in `restart/` is in the old format, without the
+  `traj.sav` header line, so this example also tests that old files are
+  still read; the `traj.sav` the run writes has the header. Two files
+  differ by design. `wf0` is the t = 80 restart state,
   because `set_traj` rewrites it. `wft` has a t = 80 block followed by a
   t = 100 block, because it is appended.
 - **h-c4h9-14**: uses the same geometry as above with a much shorter run

@@ -372,7 +372,30 @@ ch.~\ref{ch:trouble}.
 With \code{ist = 1} on line 9:
 \begin{itemize}
 \item \code{traj.sav} supplies the time and all QT positions, momenta,
-  actions and weights.
+  actions and weights. Its format:
+\begin{lstlisting}
+# 48 42  0.2000000000000000E+02 10   np nd dt kout (qtes traj.sav header)
+   80.0000000000000
+<positions of QT 1> <w>
+<momenta of QT 1> <s>
+... two lines per QT
+\end{lstlisting}
+  \begin{itemize}
+  \item The header line (\code{#}) records \code{np}, \code{nd} ($3\times$
+    number of atoms), the large time step \code{dt} and \code{kout} of the
+    run that wrote the file. On restart, each must match the current
+    inputs, otherwise the run stops with \code{RESTART ERROR} naming the
+    value that changed, e.g.\
+    \code{np changed between runs: traj.sav 48, INdyn line 9 50}.
+  \item The file must also hold exactly \code{np} complete QTs. Too few,
+    too many, or a file that ends inside a QT stops the run with a message
+    giving the counts.
+  \item Files without the header (written by older versions) are still
+    accepted; only the QT count is checked then. Deleting the header line
+    turns a new file into the old format, e.g.\ for an older \code{qtes.x}.
+  \item All checks happen on rank 0 before anything is appended to the
+    output files; an error stops all ranks.
+  \end{itemize}
 \item The output files \code{traj aver qt.dat pfit qtx qty qtz ener clx cly
   clz wft cor} must already exist. They are opened with
   \code{status='old'} and appended to.
@@ -548,7 +571,8 @@ classical copies}
   parameter in \code{INdyn}.
   \begin{itemize}
   \item Points whose Gaussian weight is at or below $10^{-\mathtt{pow}}$
-    are rejected.
+    are meant to be rejected; because of open issue \#10 a rejected point
+    currently replaces the last accepted one instead.
   \item Each accepted point gets weight $w = 1/n_p$.
   \item All momenta are set to $p_0$, with no momentum sampling.
   \end{itemize}
@@ -765,7 +789,8 @@ File & Content and columns \\
   otherwise) \\
 \code{qt.dat} & 2 lines per QT per large step: all positions + $w$, then
   all momenta + $s$ (full precision) \\
-\code{traj.sav} & restart checkpoint: time, then the same 2 lines per QT \\
+\code{traj.sav} & restart checkpoint: header line \code{# np nd dt kout},
+  the time, then the same 2 lines per QT (sec.~\ref{sec:restart}) \\
 \code{wf0}, \code{wft} & initial and final positions of every QT (first 40
   coordinates). On restart, \code{wf0} holds the restart state and
   \code{wft} is appended to \\
@@ -902,9 +927,10 @@ step in $E_\mathrm{total}$ when a QT re-enters below \code{qmx} & free
   after \code{FINISHED SAMPLING} &
   some MPI rank would get no QTs (\code{KNOWN_ISSUES.md} F9) & use the
   rank or QT counts the message suggests \\
-run hangs or crashes on restart after \code{NOT ENOUGH TRAJ DATA PROVIDED} &
-  \code{traj.sav} holds fewer QTs than \code{np} (\code{KNOWN_ISSUES.md}
-  \#9) & make \code{np} in \code{INdyn} match \code{traj.sav} \\
+\code{RESTART ERROR: ...} at the start of a restart & \code{traj.sav} does
+  not fit the inputs (\code{np}, atoms, \code{dt} or \code{kout} changed) or
+  is incomplete; the message names the problem & fix the input it names,
+  or use the right \code{traj.sav} (sec.~\ref{sec:restart}) \\
 run hangs or crashes at start with a large system & stack too small &
   \code{ulimit -s unlimited} \\
 \bottomrule
@@ -990,19 +1016,18 @@ main program.
 This appendix lists the open issues and the behaviour that is easy to miss,
 as of this version of the manual. The bug tracker
 \code{docs/KNOWN_ISSUES.md} is the up-to-date record, including the history
-of the fixed bugs F1--F9 with their verification.
+of the fixed bugs F1--F10 with their verification.
 
 \section{Open issues}
 
-\paragraph{\#9. Restart with too few QTs in \texttt{traj.sav} does not stop
-cleanly.}
+\paragraph{\#10. Sampling: a rejected point replaces the last accepted
+one.}
 \begin{itemize}
-\item If \code{traj.sav} holds fewer QTs than \code{np} in \code{INdyn},
-  \code{set_traj} prints \code{NOT ENOUGH TRAJ DATA PROVIDED} and calls
-  \code{mpi_abort()} without its arguments, on rank 0 only. The run may
-  then crash or hang instead of stopping cleanly.
-\item \textbf{Workaround:} keep \code{np} in \code{INdyn} equal to the
-  number of QTs in \code{traj.sav}.
+\item With \code{isr = 1}, a point outside the \code{pow} cutoff is still
+  stored, in the slot of the last accepted point. So the cutoff does not
+  remove tail points as intended (about 2.7\,\% of the points at
+  \code{pow = 2}, 0.04\,\% at \code{pow = 4}, for one quantum atom). The
+  number of QTs is not affected.
 \end{itemize}
 
 \section{Behaviour that is easy to miss}

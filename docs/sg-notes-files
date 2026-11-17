@@ -78,6 +78,7 @@ nqd==number of QDOF; np== number of trajectories (QTs);
 		(x(i,k),k=1,40),i=1,np)
 
  32 'traj.sav'  saves current QT info for reading instead of initializing  on rerun
+		# np nd dt kout   (header line, since 2026-11; dt = large step)
 	 	time\\
 		 all positions of QTs (x(*,n),n=1,nd), w(*) \\	
  		 all momenta of QTs (p(*,n),n=1,nd), s(*) 

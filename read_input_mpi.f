@@ -159,22 +159,9 @@ c----------------------------------------------------------------
         write(*,*) 'LEAVE MPI INPUT'
 c---------- SG read trajectory arrays ---------------
         if(ist.ne.0) then
-1008     format(700(e23.16,1x))
-         ic=0
-         open(32,file='traj.sav')
-         read(32,*,END=101) tc
+         call rdsav(nd,np,tc,x,p,s,w)
          krst=int(tc/(dt*kout))
          kmax=kmax-tc/(dt*kout)
-         do i=1,np
-          ic=ic+1
-          read(32,1008,END=101) (x(k,i),k=1,nd),w(i)
-          read(32,1008,END=101) (p(k,i),k=1,nd),s(i)
-         enddo
-101      if(ic.ne.np) then
-          write(*,*) 'NOT ENOUGH TRAJ DATA PROVIDED'      
-          call mpi_abort()
-         endif
-         close(32)
         endif
 
 

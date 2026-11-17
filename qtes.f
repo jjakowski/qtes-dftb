@@ -196,6 +196,7 @@
           write(10,1000) t,(x(k,2),k=1,4*nqd),s(2)
           flush(10)
           open(32,file='traj.sav')
+          write(32,1009) np,nd,dt*kout,kout
           write(32,*) t
           do n=1,np
            write(32,1008) (x(k,n),k=1,nd),w(n)
@@ -244,6 +245,8 @@ c         close(95+myid)
 !--------------------------------------------------------------------
 1000    format(200(e12.5,1x))
 1008    format(700(e23.16,1x))
+1009    format('# ',i0,1x,i0,1x,e23.16,1x,i0,
+     $         '   np nd dt kout (qtes traj.sav header)')
         !call mpi_barrier(MPI_COMM_WORLD,ierr)
         !write(*,*) 'MPI_BARRIER ERR',ierr
         call mpi_finalize(ierr)

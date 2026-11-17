@@ -264,7 +264,27 @@ top of each other: DFTB then fails at the first step with
 With `ist = 1` on line 9:
 
 - `traj.sav` supplies the time and all QT positions, momenta, actions and
-  weights.
+  weights. Its format:
+  ```
+  # 48 42  0.2000000000000000E+02 10   np nd dt kout (qtes traj.sav header)
+     80.0000000000000
+  <positions of QT 1> <w>
+  <momenta of QT 1> <s>
+  ... two lines per QT
+  ```
+  - The header line (`#`) records `np`, `nd` (3 × number of atoms), the
+    large time step `dt` and `kout` of the run that wrote the file. On
+    restart, each must match the current inputs, otherwise the run stops
+    with `RESTART ERROR` naming the value that changed, e.g.
+    `np changed between runs: traj.sav 48, INdyn line 9 50`.
+  - The file must also hold exactly `np` complete QTs. Too few, too many,
+    or a file that ends inside a QT stops the run with a message giving
+    the counts.
+  - Files without the header (written by older versions) are still
+    accepted; only the QT count is checked then. Deleting the header line
+    turns a new file into the old format, e.g. for an older `qtes.x`.
+  - All checks happen on rank 0 before anything is appended to the
+    output files; an error stops all ranks.
 - The output files `traj aver qt.dat pfit qtx qty qtz ener clx cly clz wft
   cor` must already exist. They are opened with `status='old'` and
   appended to.
@@ -395,7 +415,9 @@ three places: `init_traj` (initial forces), `trot` (every substep), and
 - **`isr = 1`:** each quantum coordinate is sampled as
   `q = q0 + dx * gaussian_deviate`, with `dx = 1/sqrt(4 a0)`, where `a0`
   is the width parameter in `INdyn`.
-  - Points whose Gaussian weight is at or below `10^-pow` are rejected.
+  - Points whose Gaussian weight is at or below `10^-pow` are meant to
+    be rejected; because of open issue #10 a rejected point currently
+    replaces the last accepted one instead.
   - Each accepted point gets weight `w = 1/np`.
   - All momenta are set to `p0`, with no momentum sampling.
 - **`isr = 0`:** every trajectory is placed at the centre, `q0` and `p0`.
@@ -557,7 +579,7 @@ All output files are written by MPI rank 0 into the current directory.
 | `clx cly clz` | `ipf = 0`: `t`, then x/y/z of classical atoms 1 … `min(ncl, nclprt)` from the first QT with `w > 0`. `ipf ≠ 0`: the first classical atom in QT 1 … `min(np, nqtprt)` |
 | `pfit` | `t` and the LQF fit coefficients (`ipot > 0`; empty otherwise) |
 | `qt.dat` | 2 lines per QT per large step: all positions + `w`, then all momenta + `s` (full precision) |
-| `traj.sav` | restart checkpoint: time, then the same 2 lines per QT |
+| `traj.sav` | restart checkpoint: header line `# np nd dt kout`, the time, then the same 2 lines per QT (§5.4) |
 | `wf0`, `wft` | initial and final positions of every QT (first 40 coordinates). On restart, `wf0` holds the restart state and `wft` is appended to |
 | `trajt`, `dftbt` | timings: start, end, elapsed. They differ on every run |
 | `out.dftb` | echo of the DFTB setup read from `IN_dftb` |
@@ -645,7 +667,7 @@ done
 | `MPI_FINALIZE ERR 0` (one per rank) | the return code of `MPI_Finalize`; 0 means success | none |
 | step in `E_total` when a QT re-enters below `qmx` | free flight with a frozen potential above `qmx` | raise `qmx` to where the potential is flat |
 | `RANK ERROR: N QTs on M MPI ranks leaves some ranks with no QT` right after `FINISHED SAMPLING` | some MPI rank would get no QTs (`KNOWN_ISSUES.md` F9) | use one of the rank or QT counts the message suggests |
-| run hangs or crashes on restart after `NOT ENOUGH TRAJ DATA PROVIDED` | `traj.sav` holds fewer QTs than `np` (`KNOWN_ISSUES.md` #9) | make `np` in `INdyn` match `traj.sav` |
+| `RESTART ERROR: ...` at the start of a restart | `traj.sav` does not fit the inputs (`np`, atoms, `dt` or `kout` changed) or is incomplete; the message names the problem | fix the input it names, e.g. set `np` back to the value in `traj.sav`, or use the right `traj.sav` (§5.4) |
 | run hangs or crashes at start with a large system | stack too small | `ulimit -s unlimited` |
 
 Open and fixed bugs are tracked in `docs/KNOWN_ISSUES.md`.
@@ -705,19 +727,18 @@ program.
 
 This appendix lists the open issues and the behaviour that is easy to miss,
 as of this version of the manual. The bug tracker `docs/KNOWN_ISSUES.md` is
-the up-to-date record, including the history of the fixed bugs F1–F9 with
+the up-to-date record, including the history of the fixed bugs F1–F10 with
 their verification.
 
 ### D.1 Open issues
 
-**#9. Restart with too few QTs in `traj.sav` does not stop cleanly.**
+**#10. Sampling: a rejected point replaces the last accepted one.**
 
-- If `traj.sav` holds fewer QTs than `np` in `INdyn`, `set_traj` prints
-  `NOT ENOUGH TRAJ DATA PROVIDED` and calls `mpi_abort()` without its
-  arguments, on rank 0 only. The run may then crash or hang instead of
-  stopping cleanly.
-- **Workaround:** keep `np` in `INdyn` equal to the number of QTs in
-  `traj.sav`.
+- With `isr = 1`, a point outside the `pow` cutoff is still stored, in
+  the slot of the last accepted point. So the cutoff does not remove
+  tail points as intended (about 2.7 % of the points at `pow = 2`,
+  0.04 % at `pow = 4`, for one quantum atom). The number of QTs is not
+  affected.
 
 ### D.2 Behaviour that is easy to miss
 

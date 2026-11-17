@@ -25,20 +25,7 @@
 
         write(*,*) 'READING TRAJ INFO via set_traj'
 
-1008     format(700(e23.16,1x))
-         ic=0
-         open(32,file='traj.sav')
-         read(32,*,END=101) tc
-         do i=1,np
-          ic=ic+1
-          read(32,1008,END=101) (x(k,i),k=1,nd),w(i)
-          read(32,1008,END=101) (p(k,i),k=1,nd),s(i)
-         enddo
-101      if(ic.ne.np) then
-          write(*,*) 'NOT ENOUGH TRAJ DATA PROVIDED'
-          call mpi_abort()
-         endif
-         close(32)
+         call rdsav(nd,np,tc,x,p,s,w)
 
         endif  !<---- myid=0 is done with reading
 
@@ -137,3 +124,120 @@ c  now collect all potentials and from  all Mpi tasks
         end
 !-------------------------------------------------------------
 !-------------------------------------------------------------
+        subroutine rdsav(nd,np,tc,x,p,s,w)
+!------- read the restart file traj.sav on rank 0 (issue #9) -----
+!------- optional header: '# np nd dt kout', checked against the --
+!------- inputs; then the time and 2 lines per QT. Every QT must --
+!------- be complete and the file must hold exactly np QTs. -------
+        implicit real*8 (a-h,o-z)
+        include 'bohm.inc'
+        include 'mpif.h'
+        real*8 x(ndx,npx),p(ndx,npx),s(npx),w(npx)
+        character*256 line
+        character*1 c1
+        common/prop/dt,dt2,tau(ndx),tau2(ndx),am(ndx),
+     &          ipot,ipf,nqd,kmax,kout,krst
+        open(32,file='traj.sav',status='old',iostat=ios)
+        if(ios.ne.0) then
+         write(*,*) 'RESTART ERROR: cannot open traj.sav'
+         call savfail
+        endif
+        read(32,'(a)',iostat=ios) line
+        if(ios.ne.0) then
+         write(*,*) 'RESTART ERROR: traj.sav is empty'
+         call savfail
+        endif
+!------- header line written since 2026-11: '# np nd dt kout' -----
+        ihd=0
+        line=adjustl(line)
+        if(line(1:1).eq.'#') then
+         ihd=1
+         read(line(2:),*,iostat=ios) nps,nds,dts,kos
+         if(ios.ne.0) then
+          write(*,*) 'RESTART ERROR: cannot read the traj.sav header'
+          call savfail
+         endif
+         nerr=0
+         if(nps.ne.np) then
+          write(*,1001) nps,np,nps
+          nerr=nerr+1
+         endif
+         if(nds.ne.nd) then
+          write(*,1002) nds,nds/3,nd,nd/3
+          nerr=nerr+1
+         endif
+         if(abs(dts-dt*kout).gt.1d-10*abs(dt*kout)) then
+          write(*,1003) dts,dt*kout
+          nerr=nerr+1
+         endif
+         if(kos.ne.kout) then
+          write(*,1004) kos,kout
+          nerr=nerr+1
+         endif
+         if(nerr.gt.0) call savfail
+         read(32,*,iostat=ios) tc
+        else
+         read(line,*,iostat=ios) tc
+        endif
+        if(ios.ne.0) then
+         write(*,*) 'RESTART ERROR: cannot read the time in traj.sav'
+         call savfail
+        endif
+!------- the np QTs; a short or cut line ends in an error/EOF -----
+        do i=1,np
+         read(32,*,iostat=ios) (x(k,i),k=1,nd),w(i)
+         if(ios.lt.0) then
+          write(*,1005) i-1,np
+          if(ihd.eq.0) write(*,1008) i-1
+          if(ihd.eq.1) write(*,1009) nps
+          call savfail
+         endif
+         if(ios.eq.0) read(32,*,iostat=ios) (p(k,i),k=1,nd),s(i)
+         if(ios.ne.0) then
+          write(*,1006) i
+          call savfail
+         endif
+        enddo
+!------- anything left means more QTs than np ---------------------
+        nl=0
+        do
+         read(32,'(a1)',iostat=ios) c1
+         if(ios.ne.0) exit
+         nl=nl+1
+        enddo
+        if(nl.gt.0) then
+         write(*,1007) np+nl/2,np
+         if(ihd.eq.0) write(*,1008) np+nl/2
+         if(ihd.eq.1) write(*,1009) nps
+         call savfail
+        endif
+        close(32)
+1001    format(' RESTART ERROR: np changed between runs: traj.sav ',
+     $   i0,', INdyn line 9 ',i0/'   Set np in INdyn to ',i0,
+     $   ' to continue that run.')
+1002    format(' RESTART ERROR: number of coordinates changed: ',
+     $   'traj.sav ',i0,' (',i0,' atoms), inputs ',i0,' (',i0,
+     $   ' atoms)')
+1003    format(' RESTART ERROR: time step changed: traj.sav dt=',
+     $   g0,', INdyn line 5 dt=',g0)
+1004    format(' RESTART ERROR: kout changed: traj.sav ',i0,
+     $   ', INdyn line 4 ',i0)
+1005    format(' RESTART ERROR: traj.sav holds ',i0,
+     $   ' QTs, INdyn line 9 asks for ',i0)
+1006    format(' RESTART ERROR: traj.sav ends inside QT ',i0,
+     $   ' or cannot be read there (incomplete file)')
+1007    format(' RESTART ERROR: traj.sav holds ',i0,
+     $   ' QTs, INdyn line 9 asks for ',i0)
+1008    format('   (traj.sav has no header.) If np has changed since',
+     $   ' the run that'/'   wrote it, set np in INdyn to ',i0,
+     $   '; otherwise traj.sav is'/'   incomplete or from another run.')
+1009    format('   traj.sav is damaged: its header says ',i0,' QTs.')
+        return
+        end
+!-------------------------------------------------------------
+        subroutine savfail
+!------- stop all ranks after a restart-file error (rank 0) -------
+        include 'mpif.h'
+        call flush(6)
+        call mpi_abort(MPI_COMM_WORLD,1,ierr)
+        end
