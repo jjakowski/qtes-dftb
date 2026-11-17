@@ -13,12 +13,23 @@
 !>   dftbp_driver fd [h]     also compare the gradient with central finite
 !>                           differences of the energy (step h, default
 !>                           1e-4 bohr)
+!>   dftbp_driver series FILE [file|byqt|shuffle] [fresh]
+!>                           energy + gradient for every geometry in FILE, a
+!>                           qtes-dftb qt.dat (2 lines per QT per large step:
+!>                           positions in bohr + w, then momenta + s). Order:
+!>                           file = as in FILE (one rank holding all QTs),
+!>                           byqt = each QT through all steps, shuffle = fixed
+!>                           pseudo-random order. fresh = new DFTB+ instance
+!>                           for every geometry (SCC starts from neutral atoms)
 !>
 !> Writes:
 !>   dftbp_input.hsd   the full input given to DFTB+ (incl. geometry, bohr);
 !>                     usable as dftb_in.hsd for the dftb+ program
 !>   dftbp_result.dat  energy and gradient at the INxyz geometry
 !>   dftbp.log         DFTB+ screen output
+!>   series mode: series_result.dat (per geometry: index, step, QT, call
+!>                number, energy, time) and series_grad.dat (gradient per
+!>                geometry, in file order)
 program dftbp_driver
   use dftbplus, only : TDftbPlus, TDftbPlus_init, TDftbPlus_destruct, TDftbPlusInput, fnode,&
       & setChild, setChildValue, dumpHsd, getDftbPlusBuild, getDftbPlusApi
@@ -30,29 +41,50 @@ program dftbp_driver
   real(dp), parameter :: bohrAA = 0.52918_dp
 
   type(TDftbPlus) :: dftbp
-  type(TDftbPlusInput) :: input
-  type(fnode), pointer :: pRoot, pGeo
 
   character(len=2), allocatable :: symbols(:), typeNames(:)
   integer, allocatable :: species(:)
   real(dp), allocatable :: coords(:,:), coords0(:,:), grad(:,:), grad0(:,:), gradFd(:,:)
   real(dp) :: energy, energy0, ep, em, h, errMax
   integer :: nAtom, iAt, iCart, logUnit, outUnit, major, minor, patch
-  character(len=32) :: arg
+  character(len=256) :: arg, seriesFile
+  character(len=16) :: order
   character(:), allocatable :: version
-  logical :: doFd
+  logical :: doFd, doSeries, fresh
 
   ! ---- command line
   doFd = .false.
+  doSeries = .false.
+  fresh = .false.
+  order = "file"
   h = 1.0e-4_dp
   if (command_argument_count() >= 1) then
     call get_command_argument(1, arg)
-    if (trim(arg) /= "fd") error stop "usage: dftbp_driver [fd [h]]"
-    doFd = .true.
-    if (command_argument_count() >= 2) then
-      call get_command_argument(2, arg)
-      read(arg, *) h
-    end if
+    select case (trim(arg))
+    case ("fd")
+      doFd = .true.
+      if (command_argument_count() >= 2) then
+        call get_command_argument(2, arg)
+        read(arg, *) h
+      end if
+    case ("series")
+      doSeries = .true.
+      if (command_argument_count() < 2) error stop "usage: dftbp_driver series FILE [order] [fresh]"
+      call get_command_argument(2, seriesFile)
+      do iAt = 3, command_argument_count()
+        call get_command_argument(iAt, arg)
+        select case (trim(arg))
+        case ("file", "byqt", "shuffle")
+          order = trim(arg)
+        case ("fresh")
+          fresh = .true.
+        case default
+          error stop "series options: file|byqt|shuffle, fresh"
+        end select
+      end do
+    case default
+      error stop "usage: dftbp_driver [fd [h] | series FILE [file|byqt|shuffle] [fresh]]"
+    end select
   end if
 
   ! ---- geometry from INxyz (Angstrom -> bohr)
@@ -66,22 +98,14 @@ program dftbp_driver
   call getDftbPlusBuild(version)
   call getDftbPlusApi(major, minor, patch)
   write(*, "(A,A,A,I0,'.',I0,'.',I0)") "DFTB+ build: ", version, ", API ", major, minor, patch
-  call TDftbPlus_init(dftbp, outputUnit=logUnit)
+  call setupInstance(.true.)
 
-  ! ---- settings from IN_dftbplus.hsd, geometry added in code
-  call dftbp%getInputFromFile("IN_dftbplus.hsd", input)
-  call input%getRootNode(pRoot)
-  call setChild(pRoot, "Geometry", pGeo)
-  call setChildValue(pGeo, "Periodic", .false.)
-  call setChildValue(pGeo, "TypeNames", typeNames)
-  call setChildValue(pGeo, "TypesAndCoordinates", reshape(species, [1, nAtom]), coords0)
-
-  open(newunit=outUnit, file="dftbp_input.hsd", action="write", status="replace")
-  call dumpHsd(input%hsdTree, outUnit)
-  close(outUnit)
-
-  call dftbp%setupCalculator(input)
-  if (dftbp%nrOfAtoms() /= nAtom) error stop "DFTB+ atom count differs from INxyz"
+  if (doSeries) then
+    call runSeries(trim(seriesFile), trim(order), fresh)
+    call TDftbPlus_destruct(dftbp)
+    close(logUnit)
+    stop
+  end if
 
   ! ---- 1. energy and gradient at the INxyz geometry
   call calc(coords0, energy0, grad0)
@@ -124,6 +148,140 @@ program dftbp_driver
   close(logUnit)
 
 contains
+
+  !> Creates the DFTB+ instance: settings from IN_dftbplus.hsd, geometry
+  !> (types, INxyz coordinates) added in code. Optionally writes the full
+  !> input to dftbp_input.hsd.
+  subroutine setupInstance(writeInput)
+    logical, intent(in) :: writeInput
+    type(TDftbPlusInput), allocatable :: input
+    type(fnode), pointer :: pRoot, pGeo
+    integer :: u
+    allocate(input)
+    call TDftbPlus_init(dftbp, outputUnit=logUnit)
+    call dftbp%getInputFromFile("IN_dftbplus.hsd", input)
+    call input%getRootNode(pRoot)
+    call setChild(pRoot, "Geometry", pGeo)
+    call setChildValue(pGeo, "Periodic", .false.)
+    call setChildValue(pGeo, "TypeNames", typeNames)
+    call setChildValue(pGeo, "TypesAndCoordinates", reshape(species, [1, nAtom]), coords0)
+    if (writeInput) then
+      open(newunit=u, file="dftbp_input.hsd", action="write", status="replace")
+      call dumpHsd(input%hsdTree, u)
+      close(u)
+    end if
+    call dftbp%setupCalculator(input)
+    if (dftbp%nrOfAtoms() /= nAtom) error stop "DFTB+ atom count differs from INxyz"
+  end subroutine setupInstance
+
+
+  !> Energy and gradient for every geometry of a qt.dat file, in the given
+  !> order, on one instance (or a fresh instance per geometry). Results are
+  !> written in file order, with the call number and the time per call.
+  subroutine runSeries(fname, ord, newEach)
+    character(*), intent(in) :: fname, ord
+    logical, intent(in) :: newEach
+    real(dp), allocatable :: geo(:,:,:), eSer(:), gSer(:,:,:), tSer(:)
+    integer, allocatable :: perm(:), callNo(:)
+    integer :: u, ios, nLine, nGeo, nQt, iGeo, iCall, j, k, tmp
+    integer(8) :: c0, c1, rate
+    integer(8) :: seed
+    character(len=1) :: c
+    real(dp) :: w
+    ! count lines, then read positions (odd lines; even lines are momenta)
+    open(newunit=u, file=fname, action="read", status="old")
+    nLine = 0
+    do
+      read(u, "(A1)", iostat=ios) c
+      if (ios /= 0) exit
+      nLine = nLine + 1
+    end do
+    if (mod(nLine, 2) /= 0) error stop "series file: odd number of lines"
+    nGeo = nLine / 2
+    allocate(geo(3, nAtom, nGeo), eSer(nGeo), gSer(3, nAtom, nGeo), tSer(nGeo))
+    allocate(perm(nGeo), callNo(nGeo))
+    rewind(u)
+    do iGeo = 1, nGeo
+      read(u, *) geo(:,:,iGeo), w
+      read(u, "(A1)") c
+    end do
+    close(u)
+    ! QTs per step: number of geometries before the first one repeats is not
+    ! known from the file, so take it from INdyn line 9 if present
+    nQt = qtsPerStep(nGeo)
+    ! order of the calls
+    do iGeo = 1, nGeo
+      perm(iGeo) = iGeo
+    end do
+    select case (ord)
+    case ("byqt")
+      iCall = 0
+      do j = 1, nQt
+        do k = j, nGeo, nQt
+          iCall = iCall + 1
+          perm(iCall) = k
+        end do
+      end do
+    case ("shuffle")
+      seed = 12345_8
+      do j = nGeo, 2, -1
+        seed = mod(seed * 1103515245_8 + 12345_8, 2147483648_8)
+        k = 1 + int(mod(seed, int(j, 8)))
+        tmp = perm(j)
+        perm(j) = perm(k)
+        perm(k) = tmp
+      end do
+    end select
+    write(*, "(A,A,A,I0,A,I0,A,A,A,L1)") "Series: ", fname, ", ", nGeo, " geometries, ", nQt,&
+        & " QTs per step, order ", ord, ", fresh instance per geometry: ", newEach
+    call system_clock(count_rate=rate)
+    do iCall = 1, nGeo
+      iGeo = perm(iCall)
+      callNo(iGeo) = iCall
+      call system_clock(c0)
+      if (newEach .and. iCall > 1) then
+        call TDftbPlus_destruct(dftbp)
+        call setupInstance(.false.)
+      end if
+      call calc(geo(:,:,iGeo), eSer(iGeo), gSer(:,:,iGeo))
+      call system_clock(c1)
+      tSer(iGeo) = real(c1 - c0, dp) / real(rate, dp)
+    end do
+    open(newunit=u, file="series_result.dat", action="write", status="replace")
+    write(u, "(A)") "# index step qt call energy(Ha) time(s)   (index = order in the file)"
+    do iGeo = 1, nGeo
+      write(u, "(4I6,ES24.16,ES12.4)") iGeo, (iGeo - 1) / nQt + 1, mod(iGeo - 1, nQt) + 1,&
+          & callNo(iGeo), eSer(iGeo), tSer(iGeo)
+    end do
+    close(u)
+    open(newunit=u, file="series_grad.dat", action="write", status="replace")
+    do iGeo = 1, nGeo
+      write(u, "(*(ES24.16))") gSer(:,:,iGeo)
+    end do
+    close(u)
+    write(*, "(A,F10.3,A,F10.5,A)") "Total time ", sum(tSer), " s, mean ", sum(tSer) / nGeo,&
+        & " s per geometry"
+  end subroutine runSeries
+
+
+  !> Number of QTs per large step: INdyn line 9 (first value), else nGeo
+  integer function qtsPerStep(nGeo)
+    integer, intent(in) :: nGeo
+    integer :: u, i, n
+    logical :: ex
+    character(len=256) :: line
+    qtsPerStep = nGeo
+    inquire(file="INdyn", exist=ex)
+    if (.not. ex) return
+    open(newunit=u, file="INdyn", action="read", status="old")
+    do i = 1, 9
+      read(u, "(A)") line
+    end do
+    close(u)
+    read(line, *) n
+    if (n > 0 .and. mod(nGeo, n) == 0) qtsPerStep = n
+  end function qtsPerStep
+
 
   !> One DFTB+ calculation: new coordinates in, energy and gradient out
   subroutine calc(xyz, e, g)

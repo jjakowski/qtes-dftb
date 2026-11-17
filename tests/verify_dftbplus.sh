@@ -18,7 +18,7 @@ SPL="cc.spl ch-g2ms.spl hc-g2ms.spl hh.spl"     # the four files IN_dftbplus.hsd
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate rmg-dev
 set -u            # after conda activate: its scripts use unset variables
 ulimit -s unlimited
-export OMP_NUM_THREADS=1
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 
 echo "Building driver and old-engine test program ..."
 make -s -C "$REPO/tools/dftbplus" DFTBPLUS_PREFIX="$DFTBPLUS_PREFIX" > /dev/null || exit 1

@@ -509,5 +509,65 @@ conservation. That run would need new reference outputs.
 2. **Static or shared library:** static (the default) is simplest for a
    single executable; shared is only needed if Python or Julia should load
    it too.
-3. **Charge option for production** (A, B or C), after the step 4
-   measurements and the discussion with the DFTB+ developers.
+3. **Charge option for production** (A, B or C). Step 4 measured option A
+   (`tools/dftbplus/README.md`): versus a neutral start per call, energies
+   change by ≤ 1e-12 Ha and gradients by ≤ 1.5e-7 Ha/bohr, and SCC needs
+   12 (one instance, all QTs) or 8 (each QT in turn) iterations instead of
+   14. So A is accurate enough; option B (per-QT charges) would mainly save
+   SCC iterations when an instance serves many QTs.
+
+---
+
+## 12. Lessons learned from milestone 1 (2026-11-17)
+
+Results and commands: `tools/dftbplus/README.md`.
+
+**Outcome**
+- The DFTB+ 25.1 library API works for `qtes-dftb`: set up once, then
+  `setGeometry` → `getEnergy` (Mermin free energy, Ha) → `getGradients`
+  (Ha/bohr) per geometry; no unit or sign conversion needed.
+- With the same `.spl` parameters DFTB+ reproduces the old engine: energy
+  differences within ~4e-7 Ha, gradients within ~2e-5 Ha/bohr, total energy
+  shifted by a constant (3.2e-5 Ha for 111 atoms).
+- Charge option A is accurate enough (≤ 1e-12 Ha, ≤ 1.5e-7 Ha/bohr versus a
+  neutral start; same for call order) and faster (8–12 SCC iterations
+  instead of 14). The SCC start-charge API call (milestone 4) is an
+  optimization, not a requirement.
+- DFTB+ is 2–3× faster per call than the old engine at 111 atoms
+  (0.14–0.20 s vs 0.42 s).
+
+**Details that are easy to get wrong**
+- Forces through the API need `Analysis { PrintForces = Yes }` in DFTB+
+  25.1 (ParserVersion 14). DFTB+'s own API tests use
+  `Options { CalculateForces }`, which is ParserVersion 3 syntax and is
+  rejected otherwise. Found by reading `initprogram.F90` / `oldcompat.F90`.
+- DFTB+ reads both files of an element pair (`ch-…` and `hc-…`) but logs
+  only the first.
+- DFTB+ writes `detailed.out`, `band.out`, `charges.bin`, `dftb_pin.hsd` by
+  default; switch them off for repeated calls.
+- `INxyz` files may contain a second geometry after a blank line; read only
+  the first `nat` atoms, as `qtes.x` does.
+- Only an *installed* DFTB+ build has consistent pkg-config/CMake files; the
+  older builds under `~/Development/DFTB/` were never installed.
+- `cmake --install` and `$(shell ...)` in make: `export` in a Makefile does
+  not reach `$(shell ...)`; pass `PKG_CONFIG_PATH` in the command.
+
+**Threads**
+- Always `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1`. Without the OpenBLAS
+  setting, several jobs at once ran up to 100× slower and the old engine
+  crashed (`KNOWN_ISSUES.md` #11).
+
+**Consequences for milestone 2**
+- One DFTB+ instance per MPI rank, reused for all its QTs, fits the default
+  (non-instance-safe) build and the measurements; a rank that keeps the same
+  QTs every substep is the fastest case.
+- Runs on different rank counts will agree to ~1e-7, not bit for bit:
+  regression tests for DFTB+ runs need tolerances.
+- Still to test: DFTB+ inside the MPI program, behaviour when DFTB+ stops
+  on an error in one rank, and cost for larger systems.
+
+**Process**
+- Most problems were found by checking rather than assuming (a guessed
+  keyword, a forgotten thread setting, a shell `&` that backgrounded the
+  setup). Keep checks repeatable: `tests/verify_dftbplus.sh` and
+  `tests/compare_dftbplus_series.py`.

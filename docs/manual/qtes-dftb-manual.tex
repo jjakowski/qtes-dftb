@@ -716,7 +716,8 @@ QT SPLIT (48 QTs, 5 ranks, blocks of 10): ranks 0-3: 10 each (QTs 1-40); rank 4:
 
 \paragraph{Threads.} Keep \code{OPENBLAS_NUM_THREADS=1}. This matches the
 original \code{-mkl=sequential} and avoids oversubscribing cores with MPI
-ranks $\times$ BLAS threads.
+ranks $\times$ BLAS threads. Without it, the old DFTB code was once seen to
+crash (\code{KNOWN_ISSUES.md} \#11).
 
 \paragraph{Stack.} \code{ulimit -s unlimited} is needed. With
 \code{-fopenmp}, large local arrays (about 28~MB in \code{trot}) are
@@ -1019,6 +1020,15 @@ as of this version of the manual. The bug tracker
 of the fixed bugs F1--F10 with their verification.
 
 \section{Open issues}
+
+\paragraph{\#11. Old DFTB engine crashed with multithreaded OpenBLAS.}
+\begin{itemize}
+\item In a test, the old DFTB code stopped with a segmentation fault on
+  111-atom geometries when \code{OPENBLAS_NUM_THREADS} was not set (one
+  OpenBLAS thread per core). With \code{OPENBLAS_NUM_THREADS=1} it ran
+  normally. Cause not established. \textbf{Always set
+  \code{OPENBLAS_NUM_THREADS=1}.}
+\end{itemize}
 
 \paragraph{\#10. Sampling: a rejected point replaces the last accepted
 one.}

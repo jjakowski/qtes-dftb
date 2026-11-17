@@ -536,7 +536,8 @@ mpirun -np <ranks> ./qtes.x > stdout.log 2>&1
     rank count.
 - **Threads:** keep `OPENBLAS_NUM_THREADS=1`. This matches the original
   `-mkl=sequential` and avoids oversubscribing cores with MPI ranks ×
-  BLAS threads.
+  BLAS threads. Without it, the old DFTB code was once seen to crash
+  (`KNOWN_ISSUES.md` #11).
 - **Stack:** `ulimit -s unlimited` is needed. With `-fopenmp`, large local
   arrays (about 28 MB in `trot`) are allocated on the stack.
 - **Cluster:** `docs/sbatch.script` is an old SLURM example (24 tasks per
@@ -731,6 +732,14 @@ the up-to-date record, including the history of the fixed bugs F1–F10 with
 their verification.
 
 ### D.1 Open issues
+
+**#11. Old DFTB engine crashed with multithreaded OpenBLAS.**
+
+- In a test, the old DFTB code stopped with a segmentation fault on
+  111-atom geometries when `OPENBLAS_NUM_THREADS` was not set (one
+  OpenBLAS thread per core). With `OPENBLAS_NUM_THREADS=1` it ran
+  normally. Cause not established. **Always set
+  `OPENBLAS_NUM_THREADS=1`.**
 
 **#10. Sampling: a rejected point replaces the last accepted one.**
 

@@ -7,6 +7,10 @@
 !  atoms "sym x y z itype" in Angstrom) and IN_dftb + *.spl.
 !  Prints energy and gradient at the INxyz geometry and with atom 1
 !  moved by +0.1 bohr in z; writes old_result.dat.
+!  "old_engine series FILE": instead, energy + gradient for every
+!  geometry of a qt.dat file (positions in bohr on every 2nd line),
+!  in file order; writes old_series_result.dat (index, energy, time)
+!  and old_series_grad.dat (gradient per geometry).
 !  Run on 1 MPI rank.
 !-------------------------------------------------------------
         program old_engine
@@ -17,6 +21,8 @@
         integer iat(maxat)
         character*2 sym(maxat)
         character*80 line
+        character*256 arg,sfile
+        integer*8 ic0,ic1,irate
         include '../../dftb/mpiio.inc'
 
         call mpi_init(ierr)
@@ -44,6 +50,34 @@
           c0(k,i)=c0(k,i)/0.52918d0
          enddo
         enddo
+!------- series mode -----------------------------------------
+        arg=' '
+        if(command_argument_count().ge.1)
+     $     call get_command_argument(1,arg)
+        if(trim(arg).eq.'series') then
+         call get_command_argument(2,sfile)
+         call system_clock(count_rate=irate)
+         open(30,file=trim(sfile),status='old')
+         open(31,file='old_series_result.dat',status='unknown')
+         open(32,file='old_series_grad.dat',status='unknown')
+         write(31,'(a)') '# index energy(Ha) time(s)'
+         n=0
+20       read(30,*,end=30) ((c(k,i),k=1,3),i=1,nat),w
+         read(30,'(a1)') line
+         n=n+1
+         call system_clock(ic0)
+         call oldcalc(nat,iat,c,e,g)
+         call system_clock(ic1)
+         write(31,'(i6,es24.16,es12.4)') n,e,dble(ic1-ic0)/dble(irate)
+         write(32,'(1000es24.16)') ((g(k,i),k=1,3),i=1,nat)
+         goto 20
+30       close(30)
+         close(31)
+         close(32)
+         write(*,*) 'series: ',n,' geometries'
+         call mpi_finalize(ierr)
+         stop
+        endif
 !------- 1. INxyz geometry -----------------------------------
         call oldcalc(nat,iat,c0,e0,g0)
         write(*,*)

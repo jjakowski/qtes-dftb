@@ -18,6 +18,12 @@ cp examples/h-c4h9-14/{INxyz,INdyn,IN_dftb} examples/sk/*.spl $R/
 cd $R && ulimit -s unlimited && mpirun -np 1 ../../old_engine/old_engine
 ```
 
+`old_engine series qt.dat` instead computes every geometry of a
+`qtes-dftb` `qt.dat` (milestone 1, step 4) and writes
+`old_series_result.dat` (index, energy, time per call) and
+`old_series_grad.dat`. Set `OPENBLAS_NUM_THREADS=1` (see
+`docs/KNOWN_ISSUES.md` #11).
+
 Inputs: `INdyn` (line 1: `nat`), `INxyz` (first `nat` atoms, Angstrom,
 converted with 0.52918 Å/bohr as in `read_input_mpi.f`), `IN_dftb` and the
 `.spl` files it names. Results of the comparison: `tools/dftbplus/README.md`.

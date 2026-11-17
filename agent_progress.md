@@ -137,3 +137,33 @@ steps. Newest entries at the bottom. Details of each commit are in
 - Confirmed DFTB+ reads both `hc-g2ms.spl` and `ch-g2ms.spl` (the log lists
   only the first file of each pair; a run without `ch-g2ms.spl` stops with
   "SK file not found").
+
+## 2026-11-17 — Milestone 1, step 4: repeated calls; milestone 1 complete
+
+- Committed step 3 as `063c31b`.
+- Driver: new `series` mode (read a `qt.dat`, orders `file`/`byqt`/
+  `shuffle`, optional `fresh` instance per geometry; writes
+  `series_result.dat` with time per call and `series_grad.dat`); instance
+  setup moved into `setupInstance`. `tests/old_engine`: `series` mode.
+  New `tests/compare_dftbplus_series.py` (energies, gradients, SCC
+  iterations from the DFTB+ log, timings).
+- Problems on the way:
+  1. First parallel runs forgot `OPENBLAS_NUM_THREADS=1`: jobs up to 100×
+     slower, and the old engine crashed with SIGSEGV (`tests/runs/
+     dftbp-step4_20261117-182718/old/`). With the variable set it runs
+     fine. Recorded as open issue #11 (cause not established); manuals and
+     `verify_dftbplus.sh` updated.
+  2. My first rerun command backgrounded the whole setup chain with `&`,
+     so only one job got the folder variable; fixed with a script.
+- Results (300 `h-flake-111` geometries, `tests/runs/dftbp-step4b_
+  20261117-184152/`): option A vs fresh ≤ 1.1e-12 Ha / 1.5e-7 Ha/bohr;
+  call order ≤ 1.0e-12 Ha / 1.4e-7 Ha/bohr; SCC iterations 14.3 / 11.9 /
+  11.7 / 8.0 (fresh / file / shuffle / byqt); time per call 0.251 / 0.201 /
+  0.202 / 0.141 s, old engine 0.420 s; DFTB+ − old: constant 3.16e-5 Ha
+  (spread 1.4e-7), relative energies 4.4e-7 Ha, gradients 2.2e-5 Ha/bohr.
+  No DFTB+ files written.
+- `tests/verify_dftbplus.sh` still passes after the driver changes.
+- Docs: step-4 section in `tools/dftbplus/README.md`, old-engine README,
+  KNOWN_ISSUES #11 + manuals (threads note, appendix D), audit §11, README.
+- Next: milestone 2 or 4, user to decide.
+- Added §12 "Lessons learned from milestone 1" to `docs/DFTBPLUS_AUDIT.md`.

@@ -1,6 +1,6 @@
 # agent_state.md — current state (overwrite on each update)
 
-**Last updated:** 2026-11-17 (milestone 1, step 3 done)
+**Last updated:** 2026-11-17 (milestone 1 complete)
 Check the latest commit with `git log --oneline -5`.
 
 ## Repository
@@ -16,9 +16,11 @@ Check the latest commit with `git log --oneline -5`.
 - Builds with gfortran + OpenBLAS (`(cd dftb && make libdftb) && make`).
 - All examples have reference outputs; the regression test passes
   (byte-identical, except timing files).
-- Bugs F1–F10 fixed; **one open issue: #10** (sampling: a rejected point
+- Bugs F1–F10 fixed; **open issues: #10** (sampling: a rejected point
   replaces the last accepted one; fixing it changes results, needs a
-  decision). See `docs/KNOWN_ISSUES.md`.
+  decision) and **#11** (old DFTB engine crashed once with multithreaded
+  OpenBLAS; always set `OPENBLAS_NUM_THREADS=1`). See
+  `docs/KNOWN_ISSUES.md`.
 - Docs: `README.md`, `docs/MANUAL.md` and `docs/manual/qtes-dftb-manual.tex`
   (draft; theory, parameter guidance, tutorials and developer notes still
   to be written with the user), `docs/DFTBPLUS_AUDIT.md`.
@@ -42,7 +44,7 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 | # | Milestone | Status |
 |---|---|---|
-| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (steps 1–3 done) |
+| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **done** (steps 1–4; step 5 optional, not done) |
 | 2 | Adapter inside `qtes-dftb`: `derivs` calls DFTB+ via an input switch; settings in `IN_dftbplus.hsd` | not started |
 | 3 | Dynamics with DFTB+ forces: examples, energy conservation, MPI behaviour, new references | not started |
 | 4 | SCC start-charge API call in DFTB+ (issue → fork branch → PR) | not started (can start any time) |
@@ -81,7 +83,15 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
    as the `dftb+` binary on the same input; (b) gradient vs finite
    differences; (c) same order as the old engine; (d) DFTB+ accepts the
    `.spl` files (repeat counts like `19*0.0`).
-4. **Repeated calls**: several geometries on one instance (option A); SCC
+4. **[DONE 2026-11-17] Repeated calls**: 300 `h-flake-111` geometries
+   (111 atoms) in `tests/runs/dftbp-step4b_20261117-184152/`; results in
+   `tools/dftbplus/README.md`. Option A vs fresh start: dE ≤ 1e-12 Ha,
+   d grad ≤ 1.5e-7 Ha/bohr; same for call order. SCC iterations 14.3
+   (fresh) / 11.9 (one instance, all QTs) / 8.0 (each QT in turn); time per
+   call 0.25 / 0.20 / 0.14 s vs 0.42 s old engine. DFTB+ − old: constant
+   3.16e-5 Ha offset, relative energies within 4.4e-7 Ha, gradients within
+   2.2e-5 Ha/bohr. No files written. Original plan: several geometries on
+   one instance (option A); SCC
    iterations and time per call vs old engine; order dependence within the
    SCC tolerance; no files written by DFTB+.
 5. **Optional MPI version**: one instance per rank; no file clashes; what
@@ -93,27 +103,27 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 ## Next action
 
-Milestone 1, step 4: repeated calls on one instance (option A), after the
-user's go-ahead: a series of geometries as one rank would see them (several
-QTs over a few substeps); per call the SCC iterations and time, compared
-with the old engine (`tests/old_engine/`); order dependence of E and
-gradient (within the SCC tolerance); confirm no DFTB+ files are written.
-Needs a driver mode for a geometry series (e.g. read a trajectory file).
+Milestone 1 is complete (step 5, the optional MPI version of the driver,
+was not done; its questions move to milestone 2/3). Next, after the user's
+decision: **milestone 2**, the adapter inside `qtes-dftb` (`derivs` calls
+DFTB+ through an input switch, settings in `IN_dftbplus.hsd`), and/or
+milestone 4 (SCC start-charge API call in DFTB+, issue first).
 
-Notes:
-- `IN_dftbplus.hsd` must contain `Analysis { PrintForces = Yes }`: in DFTB+
-  25.1 that switches on forces when there is no Driver (API use).
-  `Options { CalculateForces }` is ParserVersion 3 syntax and is rejected.
-- The driver reads `INxyz` up to the first blank line after the atoms (as
-  `qtes.x`); `h-c4h9-14/INxyz` has a second geometry copy after that.
-- Build: `cd tools/dftbplus && make`; old engine: `cd tests/old_engine &&
-  make` (rmg-dev).
+Notes for milestone 2 (full list: `docs/DFTBPLUS_AUDIT.md` §12, lessons learned):
+- Step-4 timing favours one DFTB+ instance per rank that follows its own
+  QTs: with the contiguous QT blocks in `qtes-dftb`, each rank computes
+  the same QTs every substep, i.e. close to the `byqt` case only if a rank
+  holds one QT; with several QTs per rank it is like the `file` case.
+- Always run with `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1` (#11).
+- Driver checks: `tests/verify_dftbplus.sh`; series comparison:
+  `tests/compare_dftbplus_series.py RUNDIR`.
 
 ## Open questions (for the user)
 
 - Static or shared DFTB+ library? (static unless Python/Julia need it)
-- Charge option for production (A, B or C), after step 4 and the DFTB+
-  discussion.
+- Charge option for production: step 4 shows option A is accurate enough
+  (effects ≤ 1.5e-7 Ha/bohr); B would mainly save SCC iterations. Decide
+  together with the DFTB+ API discussion.
 - Manual: meaning of the bonding probability `P`; is `ipot = 2` still used;
   guidance on QT count, `a0`, `dt`, `qmn`/`qmx`; theory chapter input.
 - Issue #10 (sampling): fix, and accept changed results?

@@ -41,7 +41,19 @@ Modes:
 dftbp_driver          # energy + gradient at the INxyz geometry, then with atom 1 moved +0.1 bohr in z
 dftbp_driver fd       # also compares the gradient with finite differences (step 1e-4 bohr)
 dftbp_driver fd 1e-3  # same, with step 1e-3 bohr
+dftbp_driver series qt.dat [file|byqt|shuffle] [fresh]
+                      # every geometry of a qtes-dftb qt.dat (see below)
 ```
+
+**Series mode** reads the positions from a `qt.dat` (2 lines per QT per
+large step; positions in bohr) and computes all geometries in one of three
+orders: `file` (as stored: all QTs of a step, like one rank holding all
+QTs), `byqt` (each QT through all steps, like one QT per rank), `shuffle`
+(fixed pseudo-random order). `fresh` creates a new DFTB+ instance for every
+geometry, so every SCC starts from neutral atoms. The number of QTs per
+step is taken from `INdyn` line 9. Output: `series_result.dat` (index,
+step, QT, call number, energy, time per call) and `series_grad.dat`
+(gradient per geometry, file order).
 
 The geometry is taken from `INxyz` as is; the `INdyn` displacements used by
 `qtes.x` are not applied.
@@ -105,9 +117,52 @@ Mermin free energy at the `INxyz` geometry: −10.708373137770 Ha. The
 driver made about 170 DFTB+ calls in under 0.1 s in the finite-difference
 runs.
 
+## Results of step 4 (2026-11-17)
+
+300 geometries (12 QTs × 25 large steps, 111 atoms) from
+`examples/h-flake-111/reference/qt.dat`, same settings and `.spl` files.
+Runs in `tests/runs/dftbp-step4b_20261117-184152/` (subfolders `A_file`, `A_byqt`, `A_shuffle`, `fresh`, `old`),
+one process each, `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1`. Compare with
+
+```bash
+python3 tests/compare_dftbplus_series.py tests/runs/dftbp-step4b_20261117-184152
+```
+
+| Run | SCC iterations per call | Time per call |
+|---|---|---|
+| fresh (new instance per geometry, neutral start) | 14.3 | 0.251 s (incl. setup) |
+| A, `file` order (one instance, all QTs step by step) | 11.9 | 0.201 s |
+| A, `shuffle` order | 11.7 | 0.202 s |
+| A, `byqt` order (one instance, each QT in turn) | **8.0** | **0.141 s** |
+| old engine (`tests/old_engine`), file order | – | 0.420 s |
+
+| Comparison (max over 300 geometries) | max \|dE\| (Ha) | max \|d grad\| (Ha/bohr) |
+|---|---|---|
+| A (each order) vs fresh: effect of carrying charges over | ≤ 1.1e-12 | ≤ 1.5e-7 |
+| A `file` vs `shuffle` / `byqt`: dependence on call order | ≤ 1.0e-12 | ≤ 1.4e-7 |
+| DFTB+ vs old engine | 3.2e-5 (constant offset, see below) | 2.2e-5 (rms 6e-6) |
+
+- Largest gradient component in the series: 0.18 Ha/bohr, so the effects of
+  charge carry-over and call order are below 1e-6 relative.
+- DFTB+ lies 3.16e-5 Ha above the old engine for every geometry (spread
+  1.4e-7 Ha); energies relative to the first geometry agree within 4.4e-7
+  Ha over a 0.031 Ha range. A constant offset does not affect the dynamics.
+- DFTB+ wrote no files in any run.
+- `qt.dat` holds every large step (every 2nd substep here), so consecutive
+  geometries of a QT are further apart than in a real run: the carry-over
+  test is on the safe side.
+- Timing note: without `OPENBLAS_NUM_THREADS=1`, several jobs running at
+  the same time were up to 100× slower (OpenBLAS threads competing), and the
+  old engine crashed (`docs/KNOWN_ISSUES.md` #11).
+
+**Conclusion:** charge option A is accurate enough; following each QT with
+its own instance (or in `byqt` order) is fastest. DFTB+ is about 2–3× faster
+per call than the old engine for this 111-atom system.
+
 ## Status
 
 - Step 1 (DFTB+ build): done.
 - Step 2 (driver builds and links): done.
 - Step 3 (checks a–d): done, all passed.
-- Step 4 onward: see `agent_state.md`.
+- Step 4 (repeated calls, carry-over, order, timing): done.
+- Milestone 1 complete; next milestones in `agent_state.md`.

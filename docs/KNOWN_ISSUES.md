@@ -5,6 +5,24 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
+### 11. Old DFTB engine crashed with multithreaded OpenBLAS
+
+- **Seen:** 2026-11-17, in the DFTB+ milestone-1 tests: the old-engine test
+  program `tests/old_engine/old_engine` (`dftb/libdftb.a`, called as in
+  `derivs`) stopped with `SIGSEGV` (exit code 139) on the `h-flake-111`
+  geometries (111 atoms) when `OPENBLAS_NUM_THREADS` was **not** set, while
+  three other single-process jobs ran at the same time. OpenBLAS then
+  starts one thread per core (128 on the test machine).
+- With `OPENBLAS_NUM_THREADS=1` the same program ran all 300 geometries
+  without problems, as did a single geometry with the default threads.
+- **Cause not established.** Possibly OpenBLAS threads inside the OpenMP-
+  compiled old code (`-fopenmp`), or per-thread stack limits. Not
+  reproduced on purpose, and `qtes.x` itself was not tested this way.
+- **Workaround:** always set `OPENBLAS_NUM_THREADS=1` (and
+  `OMP_NUM_THREADS=1`), as `tests/run_example.sh` does and the manual
+  recommends.
+- **Found:** 2026-11-17, `tests/runs/dftbp-step4_20261117-182718/old/`.
+
 ### 10. Sampling: a rejected point replaces the last accepted one
 
 - **Where:** `qtes.f`, `subroutine init_traj`, sampling loop
