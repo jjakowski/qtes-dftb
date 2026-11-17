@@ -33,7 +33,7 @@ dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GN
 examples/           input sets and reference results, see examples/README.md
 tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
 CLAUDE.md           instructions for Claude Code (working rules, build, tests, code conventions)
-docs/               MANUAL.md, manual/ (LaTeX), KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
+docs/               MANUAL.md, manual/ (LaTeX), KNOWN_ISSUES.md, DFTBPLUS_AUDIT.md (plan to use DFTB+); original notes: file formats (sg-notes-files), code notes, sbatch script
 ```
 
 ## Requirements
