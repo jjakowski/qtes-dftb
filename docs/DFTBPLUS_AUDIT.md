@@ -456,6 +456,9 @@ the old engine on the same geometries.
 
 ## 10. Plan for milestone 1 (proposed, not started)
 
+The current roadmap (milestones 1–6) and the status of each step are kept in
+`agent_state.md` in the repository root.
+
 | Step | Work | Where | Success check |
 |---|---|---|---|
 | 1 | Build and install the DFTB+ library (serial, API on, OpenBLAS) with `rmg-dev` gfortran | outside both repos, e.g. `~/Development/DFTB/build-qtes/` and `install-qtes/` | `dftbplus.pc` and module files installed; the standalone `dftb+` binary from the same build runs a test input |
