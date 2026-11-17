@@ -68,3 +68,19 @@ steps. Newest entries at the bottom. Details of each commit are in
   `CLAUDE.md` now points to it, `agent_state.md`, `agent_progress.md`,
   `docs/RESTART_PROMPT.md`.
 - Next: milestone 1, step 1 (DFTB+ 25.1 library build), after approval.
+
+## 2026-11-17 — Milestone 1, step 1: DFTB+ 25.1 library built
+
+- Exported tag `25.1` (commit `8802aff6`) with `git archive` into
+  `/home/j2c/Development/DFTB/dftbplus-25.1/`; the checkout stays clean.
+- Configured with `rmg-dev` gfortran 15.2, `WITH_API=ON WITH_MPI=OFF
+  WITH_OMP=OFF`, static, OpenBLAS; built in about 1 min (`-j 32`) with no
+  errors; installed to `install-qtes/` (`libdftbplus.a`, 299 module files,
+  `dftbplus.h`, `dftbplus.pc` version 25.1, `bin/dftb+`).
+- Check: CH4 SCC single point with `bin/dftb+` and 3ob-3-1 C/H (Fermi
+  6000 K, tolerance 1e-6) in `tests/runs/dftbp-step1-ch4_*`: converged in 4
+  iterations, E_Mermin = -3.2291223287 Ha, forces tetrahedrally symmetric.
+  First attempt failed on my input keyword (`Analysis/CalculateForces`);
+  fixed to `PrintForces`.
+- Added `tools/dftbplus/BUILD.md` with exact commands and results.
+- Next: step 2, the driver.

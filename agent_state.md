@@ -1,8 +1,7 @@
 # agent_state.md — current state (overwrite on each update)
 
-**Last updated:** 2026-11-17
-**Last commit before this file:** `496e099` (DFTB+ audit: plan for an SCC
-start-charge API call). Check with `git log --oneline -5`.
+**Last updated:** 2026-11-17 (milestone 1, step 1 done)
+Check the latest commit with `git log --oneline -5`.
 
 ## Repository
 
@@ -43,7 +42,7 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 | # | Milestone | Status |
 |---|---|---|
-| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **not started** |
+| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (step 1 done) |
 | 2 | Adapter inside `qtes-dftb`: `derivs` calls DFTB+ via an input switch; settings in `IN_dftbplus.hsd` | not started |
 | 3 | Dynamics with DFTB+ forces: examples, energy conservation, MPI behaviour, new references | not started |
 | 4 | SCC start-charge API call in DFTB+ (issue → fork branch → PR) | not started (can start any time) |
@@ -52,7 +51,10 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 ### Milestone 1 steps
 
-1. **Build DFTB+ 25.1 library** outside both repositories: export the tag
+1. **[DONE 2026-11-17] Build DFTB+ 25.1 library.** Exact commands, paths
+   and results in `tools/dftbplus/BUILD.md`. Installed in
+   `/home/j2c/Development/DFTB/dftbplus-25.1/install-qtes/`; `bin/dftb+`
+   passed a CH4 SCC check. Original plan: export the tag
    with `git archive 25.1` from `/home/j2c/Development/DFTB/dftbplus` into
    e.g. `/home/j2c/Development/DFTB/dftbplus-25.1/`; build in
    `.../build-qtes/`, install to `.../install-qtes/`; `rmg-dev` gfortran,
@@ -81,7 +83,17 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 ## Next action
 
-Start milestone 1, step 1 (DFTB+ build), after the user's go-ahead.
+Milestone 1, step 2: write the driver `tools/dftbplus/dftbp_driver.f90`,
+its Makefile and `IN_dftbplus.hsd`, after the user's go-ahead.
+
+Notes from step 1 for step 2:
+- `PKG_CONFIG_PATH=/home/j2c/Development/DFTB/dftbplus-25.1/install-qtes/lib/pkgconfig`;
+  link with `pkg-config --libs --static dftbplus`.
+- In DFTB+ 25.1 (ParserVersion 14) forces in `detailed.out` need
+  `Analysis { PrintForces = Yes }` (`CalculateForces` is not a keyword
+  there); the API computes gradients on request anyway.
+- `dftb+` writes `detailed.out`, `band.out`, `charges.bin`,
+  `dftb_pin.hsd` by default: switch off in the driver input.
 
 ## Open questions (for the user)
 
@@ -100,5 +112,7 @@ Start milestone 1, step 1 (DFTB+ build), after the user's go-ahead.
 - Earlier DFTB+ work (forces-print feature, fork workflow notes):
   `/home/j2c/Development/DFTB/dftbplus_forces_print`,
   `/home/j2c/Development/DFTB/readme-short.md`.
-- Planned DFTB+ 25.1 source/build/install for this project:
-  `/home/j2c/Development/DFTB/dftbplus-25.1/` (not created yet).
+- DFTB+ 25.1 source/build/install for this project (created in step 1):
+  `/home/j2c/Development/DFTB/dftbplus-25.1/` (`build-qtes/`,
+  `install-qtes/`, build logs `*-qtes.log`).
+- Parameter set used for checks: `/home/j2c/Development/DFTB/SlaKo/3ob-3-1/`.

@@ -32,6 +32,7 @@ Makefile            builds qtes.x
 dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GNUmake.inc
 examples/           input sets and reference results, see examples/README.md
 tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
+tools/dftbplus/     DFTB+ library work (milestone 1): BUILD.md with the DFTB+ build commands
 AGENTS.md           instructions for AI agents (working rules, build, tests, code conventions); CLAUDE.md points to it
 agent_state.md      current project state and next steps (for restarting work); agent_progress.md: history
 docs/               MANUAL.md, manual/ (LaTeX), KNOWN_ISSUES.md, DFTBPLUS_AUDIT.md (plan to use DFTB+), RESTART_PROMPT.md; original notes: file formats (sg-notes-files), code notes, sbatch script
