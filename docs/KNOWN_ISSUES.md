@@ -34,8 +34,8 @@ issue is fixed, move it to **Fixed** and note the commit.
   (y about 1e-20 to 1e-26) being multiplied, and it does not affect the
   results.
 
-See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
-`ipot`, `isr`, `qmn`/`qmx`, restart).
+See chapter 6 of the user manual (`docs/MANUAL.md`) for a full description
+of the run modes (`ipf`, `ipot`, `isr`, `qmn`/`qmx`, restart).
 
 - **Classical initial momenta are ignored.** `init_traj` sets the
   initial momenta of classical atoms to 0, so the px/py/pz values that
@@ -43,7 +43,7 @@ See `docs/DYNAMICS.md` for a full description of the run modes (`ipf`,
   use 0 for them anyway.
 - **With `isr = 0`, all trajectories are identical.** Sampling is off,
   so every trajectory starts at the wavepacket centre. All current
-  examples use `isr = 0`.
+  examples use `isr = 0`, except `h-flake-111`.
 - **With Ehrenfest averaging (`ipf = 0`), classical atoms are identical
   across trajectories.** Classical forces are averaged over the
   trajectories in `trot`. The exception is a trajectory excluded below

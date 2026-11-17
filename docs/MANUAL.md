@@ -22,7 +22,8 @@ statements were checked against the source code and the example runs.
 12. [Developer notes](#12-developer-notes) **[to be written]**
 
 Appendices: [A. Units](#a-units) · [B. Glossary](#b-glossary) ·
-[C. Compile-time limits](#c-compile-time-limits)
+[C. Compile-time limits](#c-compile-time-limits) ·
+[D. Known limitations](#d-known-limitations)
 
 ---
 
@@ -198,10 +199,10 @@ exactly the values listed below, except where values are marked optional.
 | 3 | `kmax` | number of large time steps | on restart, reduced automatically by the time already done |
 | 4 | `kout` | substeps per large step | |
 | 5 | `dt` | large time step | a.u. of time; the integration step is `dt/kout` |
-| 6 | `ipot isr` | `ipot`: quantum potential (0 off, 1 3-D LQF, 2 LQF along z). `isr`: initial sampling (0 off, 1 Gaussian) | `ipot > 0` requires `isr = 1` (§6) |
+| 6 | `ipot isr` | `ipot`: quantum potential (0 off, 1 3-D LQF, 2 LQF along z). `isr`: initial sampling (0 off, 1 Gaussian) | `ipot > 0` requires `isr = 1` (§6.4) |
 | 7 | `pow` | sampling cutoff: keep a sampled point if its Gaussian weight exceeds `10^-pow` | used only with `isr = 1` |
-| 8 | `ipf` | 0 = Ehrenfest (averaged classical forces); any other value = independent classical copies | §6 |
-| 9 | `np ist [nqtprt [nclprt]]` | `np`: number of QTs. `ist`: 0 = fresh start, 1 = restart from `traj.sav`. Optional print counts, default 20 each, `≤ 0` = all | §6.5, §8 |
+| 8 | `ipf` | 0 = Ehrenfest (averaged classical forces); any other value = independent classical copies | §6.3 |
+| 9 | `np ist [nqtprt [nclprt]]` | `np`: number of QTs. `ist`: 0 = fresh start, 1 = restart from `traj.sav`. Optional print counts, default 20 each, `≤ 0` = all | §5.4, §6.7, §8 |
 | 10+ | one line per atom, in the same order as `INxyz` (blank lines are skipped) | see below | |
 
 **Atom lines:**
@@ -228,7 +229,7 @@ classical atom:  sym  (ignored)  x0 y0 z0   (px py pz ignored)   m
 | 3 | `dch zh ch` | **`ch` only** | `dch`, `zh`: model-potential parameters. `ch`: reference z (bohr) used for the bonding probability in `aver` (§8.2) |
 | 4 | `esh` | **yes** | energy shift subtracted from every DFTB energy, `V = E_DFTB − esh` (hartree) |
 | 5 | `bnd` | **yes** | threshold for the bonding probability in `aver` (bohr) |
-| 6 | `qmn qmx` | **yes** | z-window for the quantum atom (bohr), §6.4 |
+| 6 | `qmn qmx` | **yes** | z-window for the quantum atom (bohr), §6.6 |
 | 7+ | `sym x y z itype` | yes | reference geometry, one line per atom, **in Ångström** (converted to bohr on input with 0.52918 Å/bohr). `itype` is the DFTB atom type, an index into `IN_dftb`. Blank lines before the geometry are allowed; lines after the first `nat` atoms are ignored |
 
 The program builds the actual starting positions from the `INxyz`
@@ -274,20 +275,187 @@ With `ist = 1` on line 9:
 
 ## 6. Run modes
 
-This section is a summary. `docs/DYNAMICS.md` describes each switch in
-detail, with the code locations.
+This chapter describes what the code does for each run-mode switch in
+`INdyn` and `INxyz`, and where in the source it does it. For bugs in these
+code paths, see `docs/KNOWN_ISSUES.md` and [appendix D](#d-known-limitations).
 
-| Mode | Switch | Typical use | Requirements |
+### 6.1 Overview
+
+- Each **quantum trajectory** (QT) `i` is a full copy of the system:
+  quantum atoms, then classical atoms. It has positions `q(:,i)`, momenta
+  `p(:,i)`, an action `s(i)`, and a weight `w(i)`.
+- The quantum atoms are listed first in `INdyn`. All current examples
+  have one quantum atom, the incoming H (atom 1).
+- `trot` (`qtes.f`) propagates every trajectory with velocity Verlet.
+  Each large step (`dt`, `INdyn` line 5) is split into `kout` substeps
+  (line 4), and there are `kmax` large steps (line 3).
+- At every substep, each trajectory gets one DFTB calculation for its own
+  geometry, which gives its potential `v(i)` and forces `dv(:,i)`.
+  Trajectories are distributed over the MPI ranks.
+- Units are atomic units: bohr, hartree, and electron masses (1836 for H).
+  `INxyz` gives the geometry in Angstrom, which the code converts to bohr
+  on input.
+
+### 6.2 Switches
+
+| Switch | Input | Values | Code |
 |---|---|---|---|
-| Ehrenfest | `ipf = 0` | classical target responds to the averaged quantum atom | default in all examples |
-| Independent classical copies | `ipf ≠ 0` | each QT carries its own target | only differs from Ehrenfest when `isr = 1` |
-| No quantum potential | `ipot = 0` | quantum atom moves classically (ensemble of classical trajectories) | — |
-| 3-D LQF | `ipot = 1` | quantum effects (zero-point energy, spreading) in x, y, z | `isr = 1` and enough QTs (≥ 4 with `w > 0`, in practice many more) |
-| LQF along z | `ipot = 2` | quantum effects along the surface normal only | `isr = 1` |
-| Sampling | `isr = 1`, `pow` | wavepacket represented by randomly sampled QTs | — |
-| z-window | `qmn`, `qmx` | below `qmn`: QT removed from the ensemble; above `qmx`: DFTB skipped (free flight) | choose `qmx` where the potential is flat |
-| Restart | `ist = 1` | continue a run from `traj.sav` | §5.4 |
-| Print options | `nqtprt`, `nclprt` | width of `qtx..clz` | §8 |
+| `ipot` | `INdyn` line 6, 1st value | 0 = no quantum potential; 1 = linear quantum-force fit in all quantum dims; 2 = linear fit along z only | `qpot`, `trot` |
+| `isr` | `INdyn` line 6, 2nd value | 0 = no sampling (all QTs at the wavepacket centre); 1 = Gaussian sampling | `init_traj` |
+| `pow` | `INdyn` line 7 | sampling cutoff: keep points with Gaussian weight > 10^-pow | `init_traj` |
+| `ipf` | `INdyn` line 8 | 0 = Ehrenfest; any other value = independent classical copies | `init_traj`, `trot`, `set_traj` |
+| `np`, restart | `INdyn` line 9, values 1-2 | number of QTs; 0 = start fresh, 1 = restart from `traj.sav` | `read_input_mpi`, `set_traj` |
+| `nqtprt`, `nclprt` | `INdyn` line 9, optional values 3-4 | QTs printed in `qtx..qtz` / classical atoms in `clx..clz` (default 20 each; 0 or less = all) | `read_input_mpi`, `aver` |
+| `qmn`, `qmx` | `INxyz` line 6 | z-window (bohr) for the quantum atom | `trot` |
+
+All current examples use `ipot=0`, `isr=0` and `ipf=0`, except
+`h-flake-111`, which uses `ipot=1` and `isr=1` (a chemisorbed H with the
+quantum potential and sampling).
+
+### 6.3 `ipf`: Ehrenfest vs independent classical copies
+
+`ipf` controls one thing only: whether the forces on the **classical**
+atoms are averaged over the trajectories. The averaging block appears in
+three places: `init_traj` (initial forces), `trot` (every substep), and
+`set_traj` (restart). The forces on the quantum atoms are never averaged.
+
+#### `ipf = 0`: Ehrenfest mode
+
+- The stdout log prints `EHRENFEST: AVERAGE OVER QDOF 0`.
+- Every classical force is replaced by the weighted average over all
+  trajectories, `<F> = sum_i w_i F_i / sum_i w_i`, and all trajectories
+  get the same value.
+- All trajectories start with the same classical positions and zero
+  classical momenta. Together with the shared force, this keeps the
+  **classical atoms identical in every trajectory**. They move as one
+  mean-field system that responds to the averaged quantum atom.
+- Each trajectory's quantum atom moves under its own DFTB force, plus the
+  quantum force when `ipot` is not 0.
+
+#### `ipf != 0`: independent classical copies
+
+- The stdout log prints `DO NOT AVERAGE OVER QDOF <ipf>`. All nonzero
+  values behave the same.
+- No averaging is done. Each trajectory carries its own copy of the
+  classical atoms, which move under the DFTB force for that trajectory's
+  own geometry. **Classical atoms therefore differ between
+  trajectories.** Where the H is in trajectory *i* determines how the
+  target moves in trajectory *i*.
+- The trajectories are coupled only through the quantum potential
+  (`ipot != 0`), and only in the quantum coordinates. With `ipot = 0`,
+  the trajectories are fully independent.
+
+#### Effect on output
+
+- In both modes, `qtx/qty/qtz` give the quantum atom's x/y/z coordinate
+  for up to `nqtprt` QTs.
+- What `clx/cly/clz` contain depends on the mode (`aver` in `qtes.f`):
+  - **`ipf = 0`:** the classical atoms are the same in every QT, so the
+    files give up to `nclprt` classical atoms, one atom per column. The
+    values are taken from the first QT with nonzero weight.
+  - **`ipf != 0`:** the classical atoms differ between QTs, so the files
+    give the first classical atom, one QT per column, for up to `nqtprt`
+    QTs.
+
+#### Caveats for both modes
+
+- With `isr = 0`, all trajectories start at the same point. They then
+  stay identical even when `ipf != 0`, so the choice of `ipf` only
+  matters when `isr = 1`.
+- A trajectory excluded below `qmn` stops moving, classical atoms
+  included. See the `qmn` / `qmx` section below.
+- No example uses `ipf != 0`, so this mode has not been tested with the
+  current build.
+
+### 6.4 `ipot`: quantum potential
+
+- **`ipot = 0`:** `qpot` returns zero, so there is no quantum
+  potential or force. The quantum atom moves classically under its own
+  DFTB force.
+- **`ipot = 1`:** the quantum force comes from a linear fit of the
+  momentum, across the ensemble, in all quantum coordinates. The fit
+  coefficients are written to `pfit`.
+- **`ipot = 2`:** the same linear fit, but only along z. In `trot`, the
+  x and y components of the quantum atom get only the DFTB force, and z
+  gets the DFTB force plus the quantum force.
+- The fit needs at least `nqd + 1` QTs with `w > 0` (2 for `ipot = 2`),
+  spread in all fitted directions. Otherwise `qpot` stops all ranks
+  with a `QPOT ERROR` message. This happens with `isr = 0`, where all
+  QTs coincide, or when too many QTs have left the `qmn`/`qmx` window.
+  With only a few QTs the fit is ill-conditioned, and the quantum force
+  can become very large even before that stop. Use enough sampled QTs
+  (`docs/KNOWN_ISSUES.md` F6).
+- Each quantum coordinate gets exactly one kick per half-step. With
+  `ipot = 1` this kick is the DFTB force plus the quantum force in all
+  directions. This was fixed in `docs/KNOWN_ISSUES.md` F8; before that fix
+  the force was applied twice.
+
+### 6.5 `isr`, `pow`: initial sampling
+
+- **`isr = 1`:** each quantum coordinate is sampled as
+  `q = q0 + dx * gaussian_deviate`, with `dx = 1/sqrt(4 a0)`, where `a0`
+  is the width parameter in `INdyn`.
+  - Points whose Gaussian weight is at or below `10^-pow` are rejected.
+  - Each accepted point gets weight `w = 1/np`.
+  - All momenta are set to `p0`, with no momentum sampling.
+- **`isr = 0`:** every trajectory is placed at the centre, `q0` and `p0`.
+- Classical atoms are never sampled. They always start at the `INxyz`
+  geometry plus the `INdyn` displacement, with **zero momentum**. The
+  classical px/py/pz values in `INdyn` are ignored.
+
+### 6.6 `qmn`, `qmx`: z-window for the quantum atom
+
+`qmn` and `qmx` do not act on individual atoms. In every substep, `trot`
+checks the z-coordinate of the **quantum atom (atom 1)** in each
+trajectory, `q(3,i)`, and applies the result to that **whole
+trajectory**:
+
+| Quantum-atom z in trajectory *i* | What `trot` does | Intended meaning |
+|---|---|---|
+| `qmn <= z <= qmx` | normal propagation | the atom is in the interaction region |
+| `z < qmn` | sets `w(i) = 0` on every rank (right after the move that crosses `qmn`), stops updating all positions in the trajectory from the next substep on, and skips DFTB | the atom has passed through or beyond the target, so the trajectory is **removed from the ensemble**. It no longer contributes to averages, energies, or the Ehrenfest force, and the norm in `aver` (column 2) drops below 1 |
+| `z > qmx` | skips DFTB; the force is set to zero and the potential is frozen at its last value. The trajectory keeps moving with its weight (free flight) | the atom is far above the target, so the expensive DFTB call is avoided |
+
+Notes:
+
+- An equivalent `z > qmx` check in the position update is commented out
+  (`qtes.f`, first half-step of `trot`).
+- Free flight above `qmx` means the total energy takes a small step
+  when a trajectory re-enters the window and DFTB resumes. Choose `qmx`
+  where the potential is flat (see `docs/KNOWN_ISSUES.md` F5).
+- Known issues in this path:
+  - F6 (fixed): with `ipot = 1`, too few QTs left inside the window
+    made the fit fail with a rank-local `stop`. The run now stops
+    cleanly on all ranks with a `QPOT ERROR`.
+  - F7 (fixed): a QT crossing `qmn` was excluded only on its owning
+    rank, so the ranks' copies of the system drifted apart. It is now
+    excluded on every rank, right after the move.
+  - F3 (fixed): the force loop zeroed an undefined weight `w(n)`.
+    It now zeroes `w(ip)`.
+  - F5 (fixed): forces outside the window were undefined. They are now
+    zero, with the potential frozen.
+  - Momenta of excluded trajectories still change in the second
+    half-step. This is harmless, because their weight is 0.
+- Most examples use `-15 15` bohr; `h-flake-53` uses `-15 50`. In the
+  current examples the H stays well inside this window. For example, in
+  `h-c4h9-14-ref` it moves from z = 8.8 to 8.0 bohr.
+
+### 6.7 Restart
+
+A restart is selected with the second value on `INdyn` line 9 set to 1.
+
+- `read_input_mpi` reads the time `t` and the number of trajectories from
+  `traj.sav`, and shortens the run to the remaining `kmax - t/dt` large
+  steps.
+- `set_traj` reloads all positions, momenta, actions and weights, and
+  then recomputes the forces, including the Ehrenfest average when
+  `ipf = 0`.
+- The output files are opened with `status='old'` and appended to, so
+  they must already exist.
+- `h-c4h9-14-restart` tests this path. It reproduces a single
+  uninterrupted run to round-off.
+
+### 6.8 Choosing modes and parameters
 
 **[to be written]** Physical guidance on choosing modes and parameters,
 for example how many QTs, `a0`, `dt`, and `qmn`/`qmx`, with the code
@@ -502,3 +670,54 @@ Open and fixed bugs are tracked in `docs/KNOWN_ISSUES.md`.
 
 After changing a limit, do a clean rebuild of both `dftb/` and the main
 program.
+
+## D. Known limitations
+
+This appendix lists the open issues and the behaviour that is easy to miss,
+as of this version of the manual. The bug tracker `docs/KNOWN_ISSUES.md` is
+the up-to-date record, including the history of the fixed bugs F1–F8 with
+their verification.
+
+### D.1 Open issues
+
+**#8. Run hangs if an MPI rank gets no QTs.**
+
+- Each rank takes a contiguous block of `ceil(np/ranks)` QTs (in
+  `init_traj`, `trot` and `set_traj`) and then calls `mpi_gather`.
+- If `(ranks-1)·ceil(np/ranks) >= np`, the last rank or ranks get no QTs.
+  The run then hangs at the first force gather in `init_traj`. All ranks
+  spin at 100 % CPU, and there is no error message.
+- Seen: `h-c4h9-14-ref` (48 QTs) hangs on 13 ranks but runs on 4, 5, 7 and
+  10 ranks, bit-identical to the reference; `h-flake-111` (12 QTs) hangs on
+  5 ranks but runs on 12.
+- **Workaround:** choose the rank count so that every rank gets at least
+  one QT. The simplest choice is a divisor of `np`.
+
+### D.2 Behaviour that is easy to miss
+
+- **Classical initial momenta are ignored.** `init_traj` sets the initial
+  momenta of classical atoms to 0, so the px/py/pz values that `INdyn`
+  gives for classical atoms are never used.
+- **With `isr = 0`, all trajectories are identical.** Sampling is off, so
+  every trajectory starts at the wavepacket centre, and `ipot > 0` cannot
+  be used (§6.4).
+- **With Ehrenfest averaging (`ipf = 0`), classical atoms are identical
+  across trajectories.** The exception is a trajectory excluded below
+  `qmn`, which stops moving (§6.6).
+- **Restart needs the old output files.** A restart opens the output files
+  with `status='old'` and appends to them, so they must already exist
+  (§5.4).
+- **`IEEE_DENORMAL` at exit is harmless.** gfortran reports that some
+  intermediate values were below about 1e-308. This comes from coordinates
+  that are essentially zero being multiplied, and it does not affect the
+  results.
+
+### D.3 Untested or restricted features
+
+- `ipf ≠ 0` (independent classical copies) and `ipot = 2` (LQF along z)
+  are not used by any example and have not been tested with the current
+  build.
+- The DFTB settings in `derivs` are hard-coded, including `ntype = 2`:
+  systems with more than two element types need a code change (§5.3).
+- The meaning of the bonding probability `P` in `aver` is still to be
+  clarified (§8.2).

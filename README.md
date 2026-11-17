@@ -10,9 +10,10 @@ examples simulate one H atom scattering off a hydrocarbon (C/H) target.
 The code is Fortran 77/90 and uses MPI over trajectories, OpenMP, and
 BLAS/LAPACK.
 
-**User manual:** [`docs/MANUAL.md`](docs/MANUAL.md) (draft). It covers
+**User manual:** [`docs/MANUAL.md`](docs/MANUAL.md) (draft), also as LaTeX in
+[`docs/manual/`](docs/manual/) (`make` builds the PDF). It covers
 installation, the line-by-line input reference, run modes, running, output
-files, and troubleshooting.
+files, troubleshooting, and known limitations.
 
 **Method:** S. Garashchuk, J. Jakowski, L. Wang, B. G. Sumpter,
 *J. Chem. Theory Comput.* **9**, 5221 (2013), doi:10.1021/ct4006147.
@@ -31,7 +32,7 @@ Makefile            builds qtes.x
 dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GNUmake.inc
 examples/           input sets and reference results, see examples/README.md
 tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
-docs/               DYNAMICS.md, KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
+docs/               MANUAL.md, manual/ (LaTeX), KNOWN_ISSUES.md; original notes: file formats (sg-notes-files), code notes, sbatch script
 ```
 
 ## Requirements
@@ -149,8 +150,8 @@ restart note, and the `h-flake-53-print` example to try.
 
 ## Dynamics modes
 
-[`docs/DYNAMICS.md`](docs/DYNAMICS.md) describes the run-mode switches and
-what the code does for each one:
+Chapter 6 of the user manual ([`docs/MANUAL.md`](docs/MANUAL.md#6-run-modes))
+describes the run-mode switches and what the code does for each one:
 - `ipf`: Ehrenfest mode vs independent classical copies
 - `ipot`: the quantum potential
 - `isr` / `pow`: initial sampling
