@@ -3,7 +3,8 @@
 !>
 !> Reads, from the current directory:
 !>   INxyz            qtes-dftb geometry file (6 parameter lines, then
-!>                    "symbol x y z itype" per atom, in Angstrom)
+!>                    "symbol x y z itype" per atom, in Angstrom, up to
+!>                    the first blank line; INdyn, if present, checks nat)
 !>   IN_dftbplus.hsd  DFTB+ settings in HSD format, without a Geometry block
 !>
 !> Usage:
@@ -147,8 +148,11 @@ contains
   end subroutine report
 
 
-  !> Reads a qtes-dftb INxyz file: 6 parameter lines, then atoms until the
-  !> end of the file (blank lines are skipped). Coordinates in Angstrom.
+  !> Reads a qtes-dftb INxyz file: 6 parameter lines, then the atoms
+  !> (blank lines before them are skipped). The geometry ends at the first
+  !> blank line or the end of the file; anything after it is ignored, as in
+  !> qtes.x. If INdyn exists, its line 1 (nat) must match the atom count.
+  !> Coordinates in Angstrom.
   subroutine readInxyz(fname, sym, xyz)
     character(*), intent(in) :: fname
     character(len=2), allocatable, intent(out) :: sym(:)
@@ -157,7 +161,8 @@ contains
     character(len=2) :: s(maxAtom)
     real(dp) :: r(3, maxAtom)
     character(len=256) :: line
-    integer :: u, ios, i, n
+    integer :: u, ios, i, n, nat
+    logical :: hasIndyn
     open(newunit=u, file=fname, action="read", status="old")
     do i = 1, 6
       read(u, "(A)") line
@@ -166,13 +171,26 @@ contains
     do
       read(u, "(A)", iostat=ios) line
       if (ios /= 0) exit
-      if (len_trim(line) == 0) cycle
+      if (len_trim(line) == 0) then
+        if (n > 0) exit
+        cycle
+      end if
       if (n == maxAtom) error stop "too many atoms in INxyz"
       n = n + 1
       read(line, *) s(n), r(:, n)
     end do
     close(u)
     if (n == 0) error stop "no atoms found in INxyz"
+    inquire(file="INdyn", exist=hasIndyn)
+    if (hasIndyn) then
+      open(newunit=u, file="INdyn", action="read", status="old")
+      read(u, *) nat
+      close(u)
+      if (nat /= n) then
+        write(*, "(A,I0,A,I0)") "INxyz has ", n, " atoms, INdyn line 1 says ", nat
+        error stop "atom count mismatch"
+      end if
+    end if
     sym = s(1:n)
     xyz = r(:, 1:n) / bohrAA
   end subroutine readInxyz

@@ -1,6 +1,6 @@
 # agent_state.md — current state (overwrite on each update)
 
-**Last updated:** 2026-11-17 (milestone 1, step 2 done)
+**Last updated:** 2026-11-17 (milestone 1, step 3 done)
 Check the latest commit with `git log --oneline -5`.
 
 ## Repository
@@ -42,7 +42,7 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 | # | Milestone | Status |
 |---|---|---|
-| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (steps 1–2 done) |
+| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (steps 1–3 done) |
 | 2 | Adapter inside `qtes-dftb`: `derivs` calls DFTB+ via an input switch; settings in `IN_dftbplus.hsd` | not started |
 | 3 | Dynamics with DFTB+ forces: examples, energy conservation, MPI behaviour, new references | not started |
 | 4 | SCC start-charge API call in DFTB+ (issue → fork branch → PR) | not started (can start any time) |
@@ -69,7 +69,14 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
    `dftbp_driver fd [h]` (for check b). Original plan: read geometry,
    `TDftbPlus_init` → `getInputFromFile` → add `Geometry` → `setupCalculator`
    → `setGeometry` → `getEnergy` / `getGradients`.
-3. **First calculation** on the `h-c4h9-14` geometry with the `.spl` files
+3. **[DONE 2026-11-17] First calculation and checks**: all four passed;
+   results table in `tools/dftbplus/README.md`, runs in
+   `tests/runs/dftbp-step3_20261117-181054/`. (a) driver = `dftb+` program
+   to printing precision; (b) gradient vs FD 3e-9 Ha/bohr at h = 1e-4;
+   (c) vs old engine (`tests/old_engine/`): E 3.4e-7 Ha, gradient 1.2e-5
+   Ha/bohr; (d) `.spl` files read as they are. Rerun all checks with
+   `tests/verify_dftbplus.sh` (PASS/FAIL). Original plan: first
+   calculation on the `h-c4h9-14` geometry with the `.spl` files
    (6000 K, SCC, tolerance 1e-6), in `tests/runs/`: (a) same E and gradient
    as the `dftb+` binary on the same input; (b) gradient vs finite
    differences; (c) same order as the old engine; (d) DFTB+ accepts the
@@ -86,21 +93,24 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 ## Next action
 
-Milestone 1, step 3: run the driver on the `h-c4h9-14` geometry in
-`tests/runs/` (copy `INxyz`, `IN_dftbplus.hsd`, `examples/sk/*.spl`), after
-the user's go-ahead. Checks: (a) `dftb+` on `dftbp_input.hsd` gives the same
-E and gradient; (b) `dftbp_driver fd`; (c) compare with the old engine
-(`derivs`) on the same geometry; (d) `.spl` files accepted.
+Milestone 1, step 4: repeated calls on one instance (option A), after the
+user's go-ahead: a series of geometries as one rank would see them (several
+QTs over a few substeps); per call the SCC iterations and time, compared
+with the old engine (`tests/old_engine/`); order dependence of E and
+gradient (within the SCC tolerance); confirm no DFTB+ files are written.
+Needs a driver mode for a geometry series (e.g. read a trajectory file).
 
 Notes:
-- Build: `cd tools/dftbplus && make` (rmg-dev); the Makefile passes
-  `PKG_CONFIG_PATH` itself (`export` does not reach `$(shell)` in this make).
-- The driver uses the `INxyz` geometry as is (no `INdyn` displacements).
-- DFTB+ 25.1: forces in `detailed.out` need `Analysis { PrintForces = Yes }`.
+- `IN_dftbplus.hsd` must contain `Analysis { PrintForces = Yes }`: in DFTB+
+  25.1 that switches on forces when there is no Driver (API use).
+  `Options { CalculateForces }` is ParserVersion 3 syntax and is rejected.
+- The driver reads `INxyz` up to the first blank line after the atoms (as
+  `qtes.x`); `h-c4h9-14/INxyz` has a second geometry copy after that.
+- Build: `cd tools/dftbplus && make`; old engine: `cd tests/old_engine &&
+  make` (rmg-dev).
 
 ## Open questions (for the user)
 
-- Does DFTB+ accept the `.spl` repeat counts? (answered by step 3)
 - Static or shared DFTB+ library? (static unless Python/Julia need it)
 - Charge option for production (A, B or C), after step 4 and the DFTB+
   discussion.

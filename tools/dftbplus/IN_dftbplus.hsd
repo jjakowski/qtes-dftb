@@ -21,12 +21,15 @@ Hamiltonian = DFTB {
   }
 }
 
-# No files from DFTB+ on each call (audit section 8.1)
+# No files from DFTB+ on each call (audit section 8.1).
 Options {
   WriteDetailedOut = No
   WriteCharges = No
 }
+# PrintForces = Yes is what makes DFTB+ 25.1 compute forces when there is
+# no Driver (API use); getGradients fails without it.
 Analysis {
+  PrintForces = Yes
   WriteBandOut = No
 }
 

@@ -81,6 +81,9 @@ A CH4 SCC single point with `bin/dftb+` (3ob-3-1 C/H parameters from
   for `qtes.x`.
 - By default `dftb+` writes `detailed.out`, `band.out`, `charges.bin` and
   `dftb_pin.hsd`. The driver must switch these off (audit §8.1).
+- Forces: with ParserVersion 14 the keyword is `Analysis { PrintForces = Yes }`.
+  It also makes the API compute forces when there is no `Driver` (see
+  `README.md`).
 - The conda environment adds its own optimization flags (e.g.
   `-march=nocona -mtune=haswell`) to the DFTB+ build through its
   `FFLAGS`/`CFLAGS`.

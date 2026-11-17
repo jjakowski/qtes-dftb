@@ -76,6 +76,9 @@ git-ignored).
   regression tests". Reference rank counts: `h-c4h9-14-ref 4`,
   `h-c4h9-14-restart 4`, `h-flake-53 48`, `h-flake-53-print 48`,
   `h-flake-111 12`.
+- **DFTB+ driver** (`tools/dftbplus/`): `tests/verify_dftbplus.sh` rebuilds
+  the driver and reruns its checks against the `dftb+` program, finite
+  differences and the old engine; all must print PASS.
 - For changes that are meant to alter results, check energy conservation
   (`E_total` in `ener`) instead, and replace references only with approval.
 

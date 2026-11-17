@@ -102,3 +102,38 @@ steps. Newest entries at the bottom. Details of each commit are in
 - `.gitignore`: `tools/dftbplus/dftbp_driver`, `*.mod`.
 - Not yet run (that is step 3).
 - Next: step 3, the checks.
+
+## 2026-11-17 — Milestone 1, step 3: driver checks, all passed
+
+- Committed step 2 as `72f2a96`.
+- Runs in `tests/runs/dftbp-step3_20261117-181054/` (h-c4h9-14 `INxyz`,
+  `examples/sk/*.spl`, `IN_dftbplus.hsd`).
+- Problems found and fixed on the way:
+  1. Driver read all of `INxyz`; that file has a second geometry copy after
+     a blank line and a comment. Now stops at the first blank line after
+     the atoms (as `qtes.x`) and checks `nat` from `INdyn` if present.
+  2. `getGradients` stopped: "Forces not available". In DFTB+ 25.1 forces
+     without a Driver are switched on by `Analysis { PrintForces = Yes }`
+     (`initprogram.F90`, `tForces = ctrl%tForces .or. tPrintForces`);
+     `Options { CalculateForces }` (used in DFTB+'s API tests with
+     ParserVersion 3) is rejected with ParserVersion 14. Added to
+     `IN_dftbplus.hsd`. The step-1 note claiming CalculateForces is not a
+     keyword was inaccurate (it lives in old syntax only); corrected.
+- Results: (d) `.spl` files read as they are, SCC in 8 iterations;
+  (a) driver vs `bin/dftb+` on `dftbp_input.hsd`: E within 3e-11 Ha,
+  gradient within 5e-13 Ha/bohr; (b) FD: 2.3e-7 / 3.1e-9 / 1.5e-9 Ha/bohr
+  for h = 1e-3 / 1e-4 / 1e-5; (c) new `tests/old_engine/` (calls `do_dftb`
+  as `derivs` does): E −10.708373138 vs −10.708373482 Ha, energy change
+  1.3030151e-3 vs 1.3030623e-3 Ha, gradient max diff 1.2e-5 Ha/bohr.
+- Docs: results in `tools/dftbplus/README.md`; `tests/old_engine/README.md`;
+  `BUILD.md` note on forces; audit §11 question on `.spl` answered;
+  README layout.
+- Next: step 4 (repeated calls, timing, order dependence).
+- Added `tests/verify_dftbplus.sh`: builds both programs, runs checks a–d
+  in `tests/runs/verify-dftbplus_<timestamp>/` copying only the files each
+  check needs, prints PASS/FAIL with fixed tolerances. First version failed
+  because `set -u` breaks `conda activate`; moved after activation. Result:
+  all four PASS, same numbers as above.
+- Confirmed DFTB+ reads both `hc-g2ms.spl` and `ch-g2ms.spl` (the log lists
+  only the first file of each pair; a run without `ch-g2ms.spl` stops with
+  "SK file not found").

@@ -31,7 +31,7 @@ bohm.inc            array limits: ndx=700 dims (~233 atoms), npx=5000 QTs, nqx=2
 Makefile            builds qtes.x
 dftb/               DFTB force library (libdftb.a) with its own GNUmakefile / GNUmake.inc
 examples/           input sets and reference results, see examples/README.md
-tests/              run_example.sh; runs go to tests/runs/ (git-ignored)
+tests/              run_example.sh; runs go to tests/runs/ (git-ignored); verify_dftbplus.sh: DFTB+ driver checks; old_engine/: old DFTB code on one geometry
 tools/dftbplus/     DFTB+ work (milestone 1): driver calling the DFTB+ library, its input and Makefile; BUILD.md with the DFTB+ build commands
 AGENTS.md           instructions for AI agents (working rules, build, tests, code conventions); CLAUDE.md points to it
 agent_state.md      current project state and next steps (for restarting work); agent_progress.md: history

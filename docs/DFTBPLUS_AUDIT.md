@@ -502,8 +502,10 @@ conservation. That run would need new reference outputs.
 
 **Still open:**
 
-1. **Repeat counts in `.spl` files** (§6): does the DFTB+ SKF reader accept
-   `19*0.0`? To be checked in milestone 1, step 3.
+1. ~~Repeat counts in `.spl` files~~ (§6): **answered in milestone 1,
+   step 3**: DFTB+ reads the `.spl` files as they are, and gives the same
+   results as the old engine (energy within 3.4e-7 Ha, gradient within
+   1.2e-5 Ha/bohr); see `tools/dftbplus/README.md`.
 2. **Static or shared library:** static (the default) is simplest for a
    single executable; shared is only needed if Python or Julia should load
    it too.
