@@ -5,26 +5,19 @@ issue is fixed, move it to **Fixed** and note the commit.
 
 ## Open
 
-### 8. Run hangs if an MPI rank gets no QTs
+### 9. Restart with too few QTs in `traj.sav` does not stop cleanly
 
-- **Where:** the work split in `init_traj`, `trot` and `set_traj`.
-  Each rank takes a contiguous block of `nwork = ceil(np/ranks)` QTs and
-  then calls `mpi_gather`.
-- **Problem:** if `(ranks-1)*nwork >= np`, the last rank or ranks get no
-  QTs. The run then hangs at the first force gather in `init_traj`. All
-  ranks spin at 100 % CPU, and there is no error message.
-- **Seen:**
-  - `h-c4h9-14-ref` (48 QTs) on 13 ranks hangs; on 4, 5, 7 and 10 ranks
-    it runs, bit-identical to the reference.
-  - `h-flake-111` (12 QTs) on 5 ranks hangs; on 12 ranks it runs.
-  - Uneven splits are fine as long as every rank has at least one QT.
-- **Workaround:** choose the rank count so that every rank gets at least
-  one QT. The simplest choice is a divisor of `np`.
-- **Likely fix:** check at startup and stop with a clear message.
-  Alternatively, distribute the QTs so that no rank is left empty, and
-  pass the receive counts explicitly (`mpi_gatherv`). The exact point
-  where the gather blocks has not been traced yet.
-- **Found:** 2026-11-05
+- **Where:** `set_traj.f`, after reading `traj.sav` on rank 0.
+- **Problem:** if `traj.sav` holds fewer QTs than `np` in `INdyn`, the
+  code prints `NOT ENOUGH TRAJ DATA PROVIDED` and calls `mpi_abort()`
+  without its arguments (communicator, error code, ierr), on rank 0
+  only. The call is invalid, so the run may crash or hang instead of
+  stopping cleanly. The other ranks continue to the force calculation.
+- **Workaround:** keep `np` in `INdyn` equal to the number of QTs in
+  `traj.sav`.
+- **Likely fix:** `call mpi_abort(MPI_COMM_WORLD,1,ierr)`. Not tested
+  yet.
+- **Found:** 2026-11-17, while fixing #8 (F9).
 
 ## Notes on behaviour (not bugs, but easy to miss)
 
@@ -274,3 +267,54 @@ of the run modes (`ipf`, `ipot`, `isr`, `qmn`/`qmx`, restart).
     the fix, with their references unchanged.
   - `h-flake-111` changed as intended.
   - Its first reference was created from the fixed code.
+
+### F9. Run hung if an MPI rank got no QTs (was open issue #8)
+
+- **Where:** the work split in `init_traj` (`qtes.f`), `trot` and
+  `set_traj.f`. Each rank takes a contiguous block of
+  `nwork = ceil(np/ranks)` QTs and then calls `mpi_gather`.
+- **Problem:** if `(ranks-1)*nwork >= np`, the last rank or ranks got no
+  QTs. The run then hung at the first force gather in `init_traj`, with
+  all ranks at 100 % CPU and no error message.
+  - `h-c4h9-14-ref` (48 QTs) hung on 13 ranks; `h-flake-111` (12 QTs)
+    hung on 5 ranks.
+- **Only at start-up:** the split depends only on `np` and the rank
+  count. `np` never changes during the dynamics: QTs eliminated below
+  `qmn` keep their place in their rank's block (with `w = 0` and no
+  DFTB). `np` can only shrink once, in `init_traj`, when the `pow` cutoff
+  accepts fewer points than requested (`if(ic.lt.np) np=ic`).
+- **Fix:** new `subroutine rankchk` in `qtes.f` (2026-11-17), called in
+  `init_traj` right after `np` is final and in `set_traj` before the
+  first gather. If some rank would be empty, rank 0 prints `RANK ERROR`
+  with the QT and rank counts and two ways to fix it: the largest usable
+  rank count below the one given (plus all divisors of the QT count), or
+  the nearest usable QT counts above the current one (plus any multiple
+  of the rank count; not offered on restart, where `traj.sav` fixes the
+  QT count). All ranks then stop with `mpi_abort` (exit code 1). All
+  ranks compute the same split, so they take the same decision. Every
+  run also prints a one-line `QT SPLIT` summary (`subroutine qtsplit`).
+  Example:
+  ```
+  QT SPLIT (48 QTs, 13 ranks, blocks of 4): ranks 0-11: 4 each (QTs 1-48); rank 12: none
+  RANK ERROR: 48 QTs on 13 MPI ranks leaves some ranks with no QT
+    The run is stopped. To fix it, either
+    - use 12 ranks, or any divisor of 48: 1 2 3 4 6 8 12 16 24 48
+    - or set the number of QTs (INdyn line 9) to 49-52,
+      or to any multiple of 13
+    (the MPI_ABORT report below is expected)
+  ```
+- **Verification:**
+  - `h-c4h9-14-ref` on 13 ranks, `h-flake-111` on 5 ranks and
+    `h-c4h9-14-restart` on 13 ranks now stop at once with exit code 1
+    and the message (suggested counts: 12, 4, 12).
+  - 50 QTs on 13 ranks (smoke-test inputs) pass the check and run to the
+    end: 12 ranks get 4 QTs, the last gets 2.
+  - `h-flake-111` on 20 ranks (more ranks than QTs) stops with ranks
+    12-19 empty and suggests 12 ranks or 20 QTs.
+  - The suggestion arithmetic was checked against brute force for all
+    failing combinations up to 2000 QTs and 512 ranks (908,658 cases): every
+    suggested rank count and QT range works, and none closer exists.
+  - All examples are byte-identical to their references (except the
+    timing files): `h-c4h9-14-ref` on 4, 5 and 7 ranks,
+    `h-c4h9-14-restart` on 4, `h-flake-53` and `h-flake-53-print` on
+    48, `h-flake-111` on 12.

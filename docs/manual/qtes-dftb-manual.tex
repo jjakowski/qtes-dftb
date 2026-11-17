@@ -650,10 +650,42 @@ mpirun -np <ranks> ./qtes.x > stdout.log 2>&1
   \begin{equation}
     (n_\mathrm{ranks} - 1)\,\lceil n_p / n_\mathrm{ranks} \rceil < n_p .
   \end{equation}
-  Otherwise the run \textbf{hangs} at the start, with no error message
-  (\code{KNOWN_ISSUES.md} \#8).
+  Otherwise the run stops right after sampling (or after reading
+  \code{traj.sav} on restart) with \code{RANK ERROR}, and suggests usable
+  rank counts (\code{KNOWN_ISSUES.md} F9). The message, for 48 QTs on 13
+  ranks:
+\begin{lstlisting}
+QT SPLIT (48 QTs, 13 ranks, blocks of 4): ranks 0-11: 4 each (QTs 1-48); rank 12: none
+RANK ERROR: 48 QTs on 13 MPI ranks leaves some ranks with no QT
+  The run is stopped. To fix it, either
+  - use 12 ranks, or any divisor of 48: 1 2 3 4 6 8 12 16 24 48
+  - or set the number of QTs (INdyn line 9) to 49-52,
+    or to any multiple of 13
+  (the MPI_ABORT report below is expected)
+\end{lstlisting}
+  \begin{itemize}
+  \item The suggested rank count is the largest one below the given count
+    that works. Smaller counts do not always work (48 QTs on 11 ranks also
+    leaves a rank empty), but divisors of the QT count always do.
+  \item The suggested QT counts are the nearest range above the current
+    one. More QTs do not always help: with 13 ranks, 49--52 QTs work but
+    53 do not (blocks of 5 leave rank 12 empty again). Multiples of the
+    rank count always work.
+  \item On a restart, the QT count is fixed by \code{traj.sav}, so only the
+    rank count is suggested.
+  \item With sampling, the number of QTs run can be smaller than the
+    \code{INdyn} value if the \code{pow} cutoff rejects points; the check
+    and the suggestions use the number actually run.
+  \end{itemize}
+\item \textbf{Split line:} every run prints one line in \code{stdout.log}
+  showing which ranks get which QTs, e.g.\ for 48 QTs on 5 ranks:
+\begin{lstlisting}
+QT SPLIT (48 QTs, 5 ranks, blocks of 10): ranks 0-3: 10 each (QTs 1-40); rank 4: 8 (QTs 41-48)
+\end{lstlisting}
+  It stays one line for any number of QTs and ranks.
 \item Uneven splits are fine. For example, 48 QTs run on 4, 5, 7 or 10
-  ranks with bit-identical results, but hang on 13 ranks.
+  ranks with bit-identical results, but stop on 13 ranks. Adding QTs also
+  helps: 50 QTs on 13 ranks run (12 ranks with 4 QTs, the last with 2).
 \item The safest choice is a divisor of $n_p$. Results do not depend on the
   rank count.
 \end{itemize}
@@ -741,7 +773,8 @@ File & Content and columns \\
   every run \\
 \code{out.dftb} & echo of the DFTB setup read from \code{IN_dftb} \\
 \code{stdout.log} & screen output: setup summary, including
-  \code{PRINT OPTIONS}, initial energies, step counter \\
+  \code{PRINT OPTIONS} and the \code{QT SPLIT} line
+  (ch.~\ref{ch:running}), initial energies, step counter \\
 \code{fort.1000+rank} & per-rank trace written at initialization \\
 \bottomrule
 \end{xltabular}
@@ -865,9 +898,13 @@ restart stops opening a file & restart needs the previous output files &
 step in $E_\mathrm{total}$ when a QT re-enters below \code{qmx} & free
   flight with a frozen potential above \code{qmx} & raise \code{qmx} to
   where the potential is flat \\
-run hangs right after \code{FINISHED SAMPLING}, all ranks at 100\,\% CPU &
-  some MPI rank has no QTs (\code{KNOWN_ISSUES.md} \#8) & use a rank count
-  with every rank getting $\ge 1$ QT, e.g.\ a divisor of $n_p$ \\
+\code{RANK ERROR: N QTs on M MPI ranks leaves some ranks with no QT} right
+  after \code{FINISHED SAMPLING} &
+  some MPI rank would get no QTs (\code{KNOWN_ISSUES.md} F9) & use the
+  rank or QT counts the message suggests \\
+run hangs or crashes on restart after \code{NOT ENOUGH TRAJ DATA PROVIDED} &
+  \code{traj.sav} holds fewer QTs than \code{np} (\code{KNOWN_ISSUES.md}
+  \#9) & make \code{np} in \code{INdyn} match \code{traj.sav} \\
 run hangs or crashes at start with a large system & stack too small &
   \code{ulimit -s unlimited} \\
 \bottomrule
@@ -953,24 +990,19 @@ main program.
 This appendix lists the open issues and the behaviour that is easy to miss,
 as of this version of the manual. The bug tracker
 \code{docs/KNOWN_ISSUES.md} is the up-to-date record, including the history
-of the fixed bugs F1--F8 with their verification.
+of the fixed bugs F1--F9 with their verification.
 
 \section{Open issues}
 
-\paragraph{\#8. Run hangs if an MPI rank gets no QTs.}
+\paragraph{\#9. Restart with too few QTs in \texttt{traj.sav} does not stop
+cleanly.}
 \begin{itemize}
-\item Each rank takes a contiguous block of
-  $\lceil n_p / n_\mathrm{ranks} \rceil$ QTs (in \code{init_traj},
-  \code{trot} and \code{set_traj}) and then calls \code{mpi_gather}.
-\item If $(n_\mathrm{ranks} - 1)\,\lceil n_p / n_\mathrm{ranks} \rceil \ge
-  n_p$, the last rank or ranks get no QTs. The run then hangs at the first
-  force gather in \code{init_traj}. All ranks spin at 100\,\% CPU, and
-  there is no error message.
-\item Seen: \code{h-c4h9-14-ref} (48 QTs) hangs on 13 ranks but runs on 4,
-  5, 7 and 10 ranks, bit-identical to the reference; \code{h-flake-111}
-  (12 QTs) hangs on 5 ranks but runs on 12.
-\item \textbf{Workaround:} choose the rank count so that every rank gets at
-  least one QT. The simplest choice is a divisor of $n_p$.
+\item If \code{traj.sav} holds fewer QTs than \code{np} in \code{INdyn},
+  \code{set_traj} prints \code{NOT ENOUGH TRAJ DATA PROVIDED} and calls
+  \code{mpi_abort()} without its arguments, on rank 0 only. The run may
+  then crash or hang instead of stopping cleanly.
+\item \textbf{Workaround:} keep \code{np} in \code{INdyn} equal to the
+  number of QTs in \code{traj.sav}.
 \end{itemize}
 
 \section{Behaviour that is easy to miss}

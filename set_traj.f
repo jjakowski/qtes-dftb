@@ -43,6 +43,7 @@
         endif  !<---- myid=0 is done with reading
 
 !---------------------------------------------------------------
+        call rankchk(np,numprocs,myid,1)
 c distribute work
         nwork = (np + numprocs-1) /numprocs
         ip0 = myid*nwork  + 1 

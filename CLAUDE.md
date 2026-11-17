@@ -45,8 +45,8 @@ git-ignored).
   overwrite reference data.
 - `tests/run_example.sh <example> [ranks]` creates
   `tests/runs/<example>_<timestamp>/` (git-ignored) and runs there.
-- **Rank count:** every MPI rank must get at least one QT, or the run hangs
-  (open issue #8). Use a divisor of the QT count.
+- **Rank count:** every MPI rank must get at least one QT; otherwise the
+  run stops with `RANK ERROR` (F9). Use a divisor of the QT count.
 - **Regression test:** run every example and compare with
   `examples/<example>/reference/`. All files must be byte-identical except
   the timing files `trajt` and `dftbt`. The loop is in the manual, chapter

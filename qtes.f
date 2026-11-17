@@ -350,6 +350,7 @@ c--------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !---------------------------------------------------------------
 105     if (myid.eq.0) write(*,*) 'FINISHED SAMPLING',ic,np,'OUT OF',i
         if(ic.lt.np) np=ic
+        call rankchk(np,numprocs,myid,0)
 c distribute work
         nwork = (np + numprocs-1) /numprocs
         ip0 = myid*nwork  + 1 
@@ -1018,6 +1019,116 @@ c-------------------------------------------------------------
         write(*,*) '  qmn/qmx window: isr=1, more QTs, wider window'
         call flush(6)
         call mpi_abort(MPI_COMM_WORLD,1,ierr)
+        end
+!-------------------------------------------------------------
+        subroutine rankchk(np,numprocs,myid,irst)
+!------- every rank needs at least one QT, otherwise the force ----
+!------- gather hangs (issue #8). The split depends only on np ----
+!------- and numprocs, so all ranks take the same decision. -------
+!------- irst=1: restart, the QT count is fixed by traj.sav -------
+        implicit real*8 (a-h,o-z)
+        include 'bohm.inc'
+        include 'mpif.h'
+        integer idv(npx)
+        nwork = (np + numprocs-1) /numprocs
+        if(myid.eq.0) call qtsplit(np,numprocs,nwork)
+        if((numprocs-1)*nwork.lt.np) return
+        if(myid.eq.0) then
+!------- largest usable rank count below numprocs ----------------
+         mok=1
+         do m=numprocs-1,1,-1
+          mw=(np+m-1)/m
+          if((m-1)*mw.lt.np) then
+           mok=m
+           goto 10
+          endif
+         enddo
+10       nd=0
+         do m=1,np
+          if(mod(np,m).eq.0) then
+           nd=nd+1
+           idv(nd)=m
+          endif
+         enddo
+!------- nearest usable QT counts above np: blocks of nb ---------
+         nb=np/numprocs+1
+         nlo=max((numprocs-1)*nb+1,np+1)
+         nhi=numprocs*nb
+         write(*,1001) np,numprocs
+         if(irst.eq.0) then
+          write(*,1002)
+         else
+          write(*,1008)
+         endif
+         write(*,1003) mok,np,(idv(m),m=1,nd)
+         if(irst.eq.0) then
+          if(nlo.eq.nhi) then
+           write(*,1004) nlo,numprocs
+          else
+           write(*,1005) nlo,nhi,numprocs
+          endif
+         else
+          write(*,1006)
+         endif
+         write(*,1007)
+         call flush(6)
+        endif
+1001    format(' RANK ERROR: ',i0,' QTs on ',i0,
+     $         ' MPI ranks leaves some ranks with no QT')
+1002    format('   The run is stopped. To fix it, either')
+1003    format('   - use ',i0,' ranks, or any divisor of ',i0,':',
+     $         *(1x,i0))
+1004    format('   - or set the number of QTs (INdyn line 9) to ',i0,
+     $         ','/'     or to any multiple of ',i0)
+1005    format('   - or set the number of QTs (INdyn line 9) to ',
+     $         i0,'-',i0,','/'     or to any multiple of ',i0)
+1006    format('   (restart: the number of QTs is fixed by traj.sav)')
+1007    format('   (the MPI_ABORT report below is expected)')
+1008    format('   The run is stopped. To fix it:')
+        call mpi_barrier(MPI_COMM_WORLD,ierr)
+        call mpi_abort(MPI_COMM_WORLD,1,ierr)
+        end
+!-------------------------------------------------------------
+        subroutine qtsplit(np,numprocs,nwork)
+!------- one line describing which ranks get which QTs: ----------
+!------- kf full blocks, then a partial block of ir, then none ----
+        kf=np/nwork
+        ir=np-kf*nwork
+        write(*,1001,advance='no') np,numprocs,nwork
+        call prange(0,kf-1)
+        write(*,1002,advance='no') nwork,kf*nwork
+        ie=kf
+        if(ir.gt.0) then
+         write(*,'(a)',advance='no') ';'
+         call prange(kf,kf)
+         if(ir.eq.1) then
+          write(*,1003,advance='no') np
+         else
+          write(*,1004,advance='no') ir,kf*nwork+1,np
+         endif
+         ie=kf+1
+        endif
+        if(ie.le.numprocs-1) then
+         write(*,'(a)',advance='no') ';'
+         call prange(ie,numprocs-1)
+         write(*,1005,advance='no')
+        endif
+        write(*,'(a)') ''
+1001    format(' QT SPLIT (',i0,' QTs, ',i0,' ranks, blocks of ',
+     $         i0,'):')
+1002    format(': ',i0,' each (QTs 1-',i0,')')
+1003    format(': 1 (QT ',i0,')')
+1004    format(': ',i0,' (QTs ',i0,'-',i0,')')
+1005    format(': none')
+        end
+!-------------------------------------------------------------
+        subroutine prange(ia,ib)
+!------- prints " rank ia" or " ranks ia-ib" (no newline) ---------
+        if(ia.eq.ib) then
+         write(*,'(a,i0)',advance='no') ' rank ',ia
+        else
+         write(*,'(a,i0,a,i0)',advance='no') ' ranks ',ia,'-',ib
+        endif
         end
 !-------------------------------------------------------------
         subroutine dotvec(n,nd,f,b,p)
