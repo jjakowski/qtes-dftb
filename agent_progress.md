@@ -84,3 +84,21 @@ steps. Newest entries at the bottom. Details of each commit are in
   fixed to `PrintForces`.
 - Added `tools/dftbplus/BUILD.md` with exact commands and results.
 - Next: step 2, the driver.
+
+## 2026-11-17 — Milestone 1, step 2: driver written, builds and links
+
+- Committed step 1 as `c1d2e76`.
+- New in `tools/dftbplus/`: `dftbp_driver.f90` (free-form; reads `INxyz` and
+  `IN_dftbplus.hsd`, adds the Geometry block in code, `setupCalculator`,
+  then `setGeometry`/`getEnergy`/`getGradients`; second geometry with atom 1
+  moved; optional finite-difference mode; dumps the full input to
+  `dftbp_input.hsd`), `IN_dftbplus.hsd` (old hard-coded settings as input:
+  SCC, tolerance 1e-6, charge 0, Fermi 6000 K, max. angular momenta, `.spl`
+  files; DFTB+ output files switched off), `Makefile` (pkg-config),
+  `README.md`.
+- Build: `make` in `tools/dftbplus` with rmg-dev gfortran: no errors or
+  warnings. First attempt failed because `export PKG_CONFIG_PATH` in the
+  Makefile does not reach `$(shell ...)`; fixed by passing it in the command.
+- `.gitignore`: `tools/dftbplus/dftbp_driver`, `*.mod`.
+- Not yet run (that is step 3).
+- Next: step 3, the checks.

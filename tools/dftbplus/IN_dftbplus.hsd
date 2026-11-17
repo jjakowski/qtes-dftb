@@ -1,0 +1,36 @@
+# DFTB+ settings for qtes-dftb (milestone 1). No Geometry block: the
+# driver adds it from INxyz. Values match the old hard-coded settings in
+# derivs (qtes.f) and IN_dftb, but can now be changed here.
+
+Hamiltonian = DFTB {
+  Scc = Yes
+  SccTolerance = 1.0e-6          # old: scftol = 1e-6
+  Charge = 0.0                   # old: qnel = 0 (neutral)
+  Filling = Fermi {
+    Temperature [K] = 6000.0     # old: telec = 6000
+  }
+  MaxAngularMomentum {           # old: IN_dftb line 2 (C: s+p, H: s)
+    C = "p"
+    H = "s"
+  }
+  SlaterKosterFiles {            # old: IN_dftb lines 3-6 (files from examples/sk)
+    C-C = "cc.spl"
+    C-H = "ch-g2ms.spl"
+    H-C = "hc-g2ms.spl"
+    H-H = "hh.spl"
+  }
+}
+
+# No files from DFTB+ on each call (audit section 8.1)
+Options {
+  WriteDetailedOut = No
+  WriteCharges = No
+}
+Analysis {
+  WriteBandOut = No
+}
+
+ParserOptions {
+  ParserVersion = 14
+  WriteHSDInput = No             # no dftb_pin.hsd
+}

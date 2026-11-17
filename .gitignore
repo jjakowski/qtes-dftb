@@ -11,3 +11,5 @@ docs/manual/*.aux
 docs/manual/*.log
 docs/manual/*.out
 docs/manual/*.toc
+tools/dftbplus/dftbp_driver
+*.mod

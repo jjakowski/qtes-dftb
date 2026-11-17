@@ -1,6 +1,6 @@
 # agent_state.md — current state (overwrite on each update)
 
-**Last updated:** 2026-11-17 (milestone 1, step 1 done)
+**Last updated:** 2026-11-17 (milestone 1, step 2 done)
 Check the latest commit with `git log --oneline -5`.
 
 ## Repository
@@ -42,7 +42,7 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 | # | Milestone | Status |
 |---|---|---|
-| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (step 1 done) |
+| 1 | Standalone driver: coordinates + settings in, energy + forces out from DFTB+ 25.1 | **in progress** (steps 1–2 done) |
 | 2 | Adapter inside `qtes-dftb`: `derivs` calls DFTB+ via an input switch; settings in `IN_dftbplus.hsd` | not started |
 | 3 | Dynamics with DFTB+ forces: examples, energy conservation, MPI behaviour, new references | not started |
 | 4 | SCC start-charge API call in DFTB+ (issue → fork branch → PR) | not started (can start any time) |
@@ -62,8 +62,11 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
    `libdftbplus.a`, module files and `dftbplus.pc` are installed and that
    the `dftb+` binary runs a DFTB+ test input. Record commands in
    `tools/dftbplus/BUILD.md`.
-2. **Write the driver** `tools/dftbplus/dftbp_driver.f90` (+ Makefile using
-   `pkg-config dftbplus`, input `IN_dftbplus.hsd`): read geometry,
+2. **[DONE 2026-11-17] Write the driver** `tools/dftbplus/dftbp_driver.f90`
+   (+ `Makefile` via pkg-config, `IN_dftbplus.hsd`, `README.md`); builds and
+   links with no warnings. Extras for step 3: writes the full DFTB+ input to
+   `dftbp_input.hsd` (for check a) and has a finite-difference mode
+   `dftbp_driver fd [h]` (for check b). Original plan: read geometry,
    `TDftbPlus_init` → `getInputFromFile` → add `Geometry` → `setupCalculator`
    → `setGeometry` → `getEnergy` / `getGradients`.
 3. **First calculation** on the `h-c4h9-14` geometry with the `.spl` files
@@ -83,17 +86,17 @@ Full analysis and decisions: `docs/DFTBPLUS_AUDIT.md` (§11 decisions).
 
 ## Next action
 
-Milestone 1, step 2: write the driver `tools/dftbplus/dftbp_driver.f90`,
-its Makefile and `IN_dftbplus.hsd`, after the user's go-ahead.
+Milestone 1, step 3: run the driver on the `h-c4h9-14` geometry in
+`tests/runs/` (copy `INxyz`, `IN_dftbplus.hsd`, `examples/sk/*.spl`), after
+the user's go-ahead. Checks: (a) `dftb+` on `dftbp_input.hsd` gives the same
+E and gradient; (b) `dftbp_driver fd`; (c) compare with the old engine
+(`derivs`) on the same geometry; (d) `.spl` files accepted.
 
-Notes from step 1 for step 2:
-- `PKG_CONFIG_PATH=/home/j2c/Development/DFTB/dftbplus-25.1/install-qtes/lib/pkgconfig`;
-  link with `pkg-config --libs --static dftbplus`.
-- In DFTB+ 25.1 (ParserVersion 14) forces in `detailed.out` need
-  `Analysis { PrintForces = Yes }` (`CalculateForces` is not a keyword
-  there); the API computes gradients on request anyway.
-- `dftb+` writes `detailed.out`, `band.out`, `charges.bin`,
-  `dftb_pin.hsd` by default: switch off in the driver input.
+Notes:
+- Build: `cd tools/dftbplus && make` (rmg-dev); the Makefile passes
+  `PKG_CONFIG_PATH` itself (`export` does not reach `$(shell)` in this make).
+- The driver uses the `INxyz` geometry as is (no `INdyn` displacements).
+- DFTB+ 25.1: forces in `detailed.out` need `Analysis { PrintForces = Yes }`.
 
 ## Open questions (for the user)
 
