@@ -286,6 +286,38 @@ The `qtes-dftb` `Makefile` can take the compile and link flags from
   new adapter would be a separate free-form `.f90` file compiled with normal
   flags. The fixed-form code just calls a plain subroutine in it.
 
+### 7.4 Fortran 77 (`qtes-dftb`) and Fortran 90/2003 (DFTB+) together
+
+This is not a problem in itself. gfortran compiles both into one program, and
+code in one style can call code in the other. "Fixed form" is a source layout,
+not a language level: gfortran accepts modern features (e.g. `use`) in
+fixed-form files. Practical rules:
+
+- **All modern Fortran stays in a small free-form adapter** (`.f90`). DFTB+
+  types and objects (`TDftbPlus`, input trees), its module and its
+  assumed-shape arrays live there. The old code only calls plain subroutines
+  with plain arguments, e.g. `dftbp_energy_gradient(nat, C, E, grad)` with
+  `C(3,nat)`, the same kind of call it makes to `do_dftb` today.
+- **Argument checking.** Old-style calls are not checked by the compiler, so
+  a wrong argument type would go unnoticed (implicit typing caused several
+  earlier bugs). The adapter should have exactly typed, explicit-shape
+  arguments. `derivs` can also `use` the adapter module, so that the
+  compiler checks each call.
+- **Number kinds must match.** `real*8` in `qtes-dftb` is DFTB+'s
+  `real(dp)`, and both use default 4-byte integers. DFTB+ must not be built
+  with `-fdefault-integer-8`, `-fdefault-real-8` or similar flags.
+- **Separate compiler flags.** The legacy flags (`-std=legacy`,
+  `-fallow-argument-mismatch`) apply only to the old files; the adapter gets
+  normal flags. Everything is compiled and linked by `mpif90` (gfortran), so
+  there is one Fortran runtime.
+- **Same gfortran version** for DFTB+ and the adapter, because of the module
+  files (§7.3).
+- **Symbol clashes are unlikely.** DFTB+ routines live in modules, so their
+  linker names carry a module prefix and cannot clash with old global names
+  such as `fermi` or `broyden` in `libdftb.a`. This matters only if both
+  engines are linked into one executable; to be confirmed in the first link
+  test.
+
 ---
 
 ## 8. Points to watch
@@ -335,10 +367,46 @@ The `qtes-dftb` `Makefile` can take the compile and link flags from
   `setRefCharges` sets the *reference* (neutral-atom) charges, not the SCC
   start guess.
 - **Decision** (§11): milestone 1 uses option A. Options B and C need an
-  API call to set the SCC start charges, which will be discussed with the
-  DFTB+ developers.
+  API call to set the SCC start charges (§8.3).
 
-### 8.3 Errors stop the program
+### 8.3 Plan: adding an API call to set the SCC start charges
+
+We would develop the call ourselves and offer it upstream as a pull request,
+following the workflow used for the `forces-print` feature (fork
+`jjakowski/dftbplus`, a feature branch in its own worktree under
+`~/Development/DFTB/`, notes in `~/Development/DFTB/readme-short.md`). This
+gives control over the design and lets `qtes-dftb` use the call before it is
+merged.
+
+**Scope** (from the audit, to be confirmed in the code):
+- **API layer:**
+  - a new call in the Fortran API (`src/dftbp/api/mm/mmapi.F90`), e.g.
+    `setSccCharges(atomCharges)`, the counterpart of `getGrossCharges`;
+  - its implementation in `src/dftbp/dftbplus/mainapi.F90`;
+  - the C wrapper in `capi.F90` and `dftbplus.h`.
+- **Inside DFTB+:** the charges are stored per orbital and spin, and the
+  SCC mixer (e.g. Broyden) keeps a history that must be reset when the start
+  charges change. A first version could accept atomic charges only, for
+  non-spin-polarized SCC, and stop with a clear error otherwise. Passing the
+  neutral reference charges through the same call would also give option C.
+- **Around the code:** an API test program in
+  `test/src/dftbp/api/mm/testers/`, an API version bump (now 0.4.0), a
+  `CHANGELOG.rst` entry, and a section in `doc/dftb+/manual/api.tex`.
+
+**Approach:**
+1. **Open a GitHub issue first**, describing the use case (one charge vector
+   per trajectory kept in memory, thousands of calls per run), so that the
+   DFTB+ developers can say how they would like it designed. This should
+   save review rounds later.
+2. Implement and test on the feature branch; build `qtes-dftb` against that
+   install for testing.
+3. Open the pull request.
+
+**`qtes-dftb` keeps working with stock DFTB+ 25.1** (option A), so it never
+depends only on an unmerged fork. The adapter uses the new call only when it
+is available.
+
+### 8.4 Errors stop the program
 
 DFTB+ reports input or convergence errors through its `error` routine,
 which stops the process. In an MPI run, one rank stopping can leave the
@@ -346,14 +414,14 @@ others hanging, like the issues fixed in F6 and F9. The adapter should
 check its inputs before calling DFTB+. Error handling in API mode should
 be tested, and `mpirun` should end the job when one rank exits.
 
-### 8.4 Per-call cost
+### 8.5 Per-call cost
 
 A run makes many calls: QTs × substeps × steps, spread over the ranks. The
 API overhead per call (`setGeometry`, neighbour list update, SCC from the
 previous charges) is unknown. It should be measured in milestone 1 against
 the old engine on the same geometries.
 
-### 8.5 Other
+### 8.6 Other
 
 - `qtes-dftb` uses `ndx = 700` coordinates (about 233 atoms) and the old
   engine's limits (`dftb/maxima.inc`). DFTB+ allocates dynamically, so its
@@ -425,6 +493,9 @@ conservation. That run would need new reference outputs.
    interface. No charges are written to or read from files. Setting the SCC
    start charges through the API (needed for options B and C) will be
    discussed with the DFTB+ developers.
+4. **The charge-setting API call** will be developed by us on a fork branch
+   and offered upstream as a pull request, after an issue agreeing on the
+   design (§8.3).
 
 **Still open:**
 
